@@ -1,5 +1,8 @@
 {
   "compilerOptions": {
+    "paths": {
+      "@config/*": ["./src/config/*"]
+    },
     "module": "nodenext",
     "moduleResolution": "nodenext",
     "resolvePackageJsonExports": true,
@@ -18,5 +21,6 @@
     "strict": true,
     "strictPropertyInitialization": false,
     "types": ["vitest/globals", "node"]
+    
   }
 }

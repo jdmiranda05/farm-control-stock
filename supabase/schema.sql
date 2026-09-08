@@ -1,4 +1,3 @@
--- Botica M&LL
 -- Base de datos para las pantallas: Login, Dashboard de Almacen,
 -- Inventario/Lotes y Kardex de Entrada.
 -- Entidad nucleo: lote.

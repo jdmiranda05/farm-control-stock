@@ -6,11 +6,13 @@ dist/
 build/
 .next/
 out/
+backend/.env
 
 # Variables de entorno y llaves secretas
 .env
 .env.local
 .env.*.local
+
 
 # Logs
 npm-debug.log*
