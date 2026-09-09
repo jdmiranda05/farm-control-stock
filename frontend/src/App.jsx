@@ -2,6 +2,7 @@ import { useState } from 'react';
 import Sidebar from './components/Sidebar';
 import Dashboard from './pages/Dashboard';
 import Inventario from './pages/Inventario';
+import KardexEntrada from './pages/KardexEntrada';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('Dashboard');
@@ -13,7 +14,7 @@ export default function App() {
       case 'Inventario':
         return <Inventario />;
       case 'Kardex Entrada':
-        return <div style={{ padding: '30px' }}><h2>Pantalla de Kardex Entrada (En construcción)</h2></div>;
+        return <KardexEntrada />;
       case 'Kardex Salida':
         return <div style={{ padding: '30px' }}><h2>Pantalla de Kardex Salida (En construcción)</h2></div>;
       default:
