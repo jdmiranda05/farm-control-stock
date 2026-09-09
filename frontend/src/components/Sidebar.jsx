@@ -1,6 +1,21 @@
 import { Home, ArrowDownLeft, ArrowUpRight, Package } from 'lucide-react';
 
-export default function Sidebar() {
+export default function Sidebar({ activeTab, setActiveTab }) {
+  
+  const getMenuItemStyle = (itemName) => {
+    const isActive = activeTab === itemName;
+    return {
+      display: 'flex',
+      alignItems: 'center',
+      padding: '12px 16px',
+      backgroundColor: isActive ? '#d1fae5' : 'transparent',
+      borderRadius: '8px',
+      cursor: 'pointer',
+      color: isActive ? '#008f7a' : '#374151',
+      fontWeight: isActive ? '600' : '500'
+    };
+  };
+
   return (
     <aside style={{ 
       width: '260px', 
@@ -33,29 +48,38 @@ export default function Sidebar() {
       <nav style={{ flex: 1 }}>
         <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '10px' }}>
           
-          {/* Item Activo */}
-          <li style={{ 
-            display: 'flex', alignItems: 'center', padding: '12px 16px', 
-            backgroundColor: '#d1fae5', borderRadius: '8px', cursor: 'pointer',
-            color: '#008f7a', fontWeight: '600'
-          }}>
+          <li 
+            style={getMenuItemStyle('Dashboard')}
+            onClick={() => setActiveTab('Dashboard')}
+          >
             <Home size={20} style={{ marginRight: '12px' }} />
             Dashboard
           </li>
 
-          {/* Items Inactivos */}
-          <li style={{ display: 'flex', alignItems: 'center', padding: '12px 16px', cursor: 'pointer', color: '#374151', fontWeight: '500' }}>
+          <li 
+            style={getMenuItemStyle('Kardex Entrada')}
+            onClick={() => setActiveTab('Kardex Entrada')}
+          >
             <ArrowDownLeft size={20} style={{ marginRight: '12px' }} />
             Kardex Entrada
           </li>
-          <li style={{ display: 'flex', alignItems: 'center', padding: '12px 16px', cursor: 'pointer', color: '#374151', fontWeight: '500' }}>
+          
+          <li 
+            style={getMenuItemStyle('Kardex Salida')}
+            onClick={() => setActiveTab('Kardex Salida')}
+          >
             <ArrowUpRight size={20} style={{ marginRight: '12px' }} />
             Kardex Salida
           </li>
-          <li style={{ display: 'flex', alignItems: 'center', padding: '12px 16px', cursor: 'pointer', color: '#374151', fontWeight: '500' }}>
+          
+          <li 
+            style={getMenuItemStyle('Inventario')}
+            onClick={() => setActiveTab('Inventario')}
+          >
             <Package size={20} style={{ marginRight: '12px' }} />
             Inventario
           </li>
+
         </ul>
       </nav>
 
