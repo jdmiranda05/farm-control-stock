@@ -11,7 +11,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
       useFactory: (config: ConfigService) => {
         return createClient(
           config.getOrThrow<string>('supabase.url'),
-          config.getOrThrow<string>('supabase.anonKey'),
+          config.getOrThrow<string>('supabase.serviceRoleKey'),
         );
       },
       inject: [ConfigService],
