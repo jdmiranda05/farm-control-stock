@@ -3,6 +3,7 @@ import Sidebar from './components/Sidebar';
 import Dashboard from './pages/Dashboard';
 import Inventario from './pages/Inventario';
 import KardexEntrada from './pages/KardexEntrada';
+import KardexSalida from './pages/KardexSalida';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('Dashboard');
@@ -16,7 +17,7 @@ export default function App() {
       case 'Kardex Entrada':
         return <KardexEntrada />;
       case 'Kardex Salida':
-        return <div style={{ padding: '30px' }}><h2>Pantalla de Kardex Salida (En construcción)</h2></div>;
+        return <KardexSalida />;
       default:
         return <Dashboard />;
     }
