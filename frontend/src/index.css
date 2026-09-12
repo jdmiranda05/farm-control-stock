@@ -18,3 +18,61 @@ body {
   font-family: 'Inter', sans-serif;
   color: var(--c-text-main);
 }
+
+/* Utilidades personalizadas */
+.text-main { color: var(--c-text-main) !important; }
+.text-muted-custom { color: var(--c-text-muted) !important; }
+.text-brand { color: var(--c-brand-base) !important; }
+.border-custom { border-color: var(--c-border) !important; }
+
+/* Tarjetas */
+.card {
+  background-color: var(--c-white);
+  border: 1px solid var(--c-border);
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+}
+
+/* Tablas */
+.table-custom th {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--c-text-muted);
+  background-color: var(--c-bg-app);
+  border-bottom: 1px solid var(--c-border);
+  padding: 16px;
+  text-transform: uppercase;
+}
+.table-custom td {
+  font-size: 13px;
+  color: var(--c-text-main);
+  padding: 16px;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--c-border);
+}
+.table-custom tr:last-child td { border-bottom: none; }
+
+/* Badges de Estado */
+.badge-success-custom { background-color: var(--c-success-bg); color: var(--c-success-text); font-weight: 600; padding: 6px 12px; border-radius: 6px; font-size: 12px; }
+.badge-danger-custom { background-color: var(--c-danger-bg); color: var(--c-danger-text); font-weight: 600; padding: 6px 12px; border-radius: 6px; font-size: 12px; }
+
+/* Gráfico de Barras CSS */
+.bar-chart-container {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  height: 120px;
+  margin-top: 30px;
+  padding: 0 10px;
+}
+.bar {
+  width: 24px;
+  background-color: var(--c-brand-base);
+  border-radius: 4px 4px 0 0;
+}
+.bar-label {
+  font-size: 10px;
+  color: var(--c-text-muted);
+  text-align: center;
+  margin-top: 8px;
+}
