@@ -42,6 +42,7 @@ lerna-debug.log*
 .env.production.local
 .env.local
 .tsconfig.build.tsbuildinfo
+tsconfig.build.tsbuildinfo
 
 # temp directory
 .temp
