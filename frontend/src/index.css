@@ -1,5 +1,11 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
 :root {
   --c-text-main: #0F172A;
   --c-text-muted: #475569;
@@ -14,8 +20,9 @@
 }
 
 body {
+  /* Combinación de ambas ramas */
   background-color: var(--c-bg-app);
-  font-family: 'Inter', sans-serif;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
   color: var(--c-text-main);
 }
 

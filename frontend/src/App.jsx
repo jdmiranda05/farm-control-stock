@@ -8,6 +8,10 @@ import { Login } from './pages/Login';
 import { ModalVenta } from './components/ModalVenta';
 import { ModalCliente } from './components/ModalCliente';
 import { supabase } from './lib/supabaseClient';
+import AlmacenDashboard from './pages/almacen/AlmacenDashboard';
+import Inventario from './pages/almacen/Inventario';
+import KardexEntrada from './pages/almacen/KardexEntrada';
+import KardexSalida from './pages/almacen/KardexSalida';
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -69,8 +73,15 @@ function App() {
 
     if (error) throw error;
 
-    await loadProfile(data.user.id);
+    const userProfile = await loadProfile(data.user.id);
     setSession(data.session);
+    
+    // Integración de roles: Redirigir según el rol del usuario
+    if (userProfile?.rol?.toUpperCase() === 'ALMACENERO') {
+      setActiveTab('almacen-dashboard');
+    } else {
+      setActiveTab('dashboard');
+    }
   };
 
   const handleLogout = async () => {
@@ -81,7 +92,7 @@ function App() {
   };
 
   if (isCheckingSession) {
-    return <div className="app-loading">Cargando sesion...</div>;
+    return <div className="app-loading">Cargando sesión...</div>;
   }
 
   if (!session) {
@@ -90,12 +101,19 @@ function App() {
 
   return (
     <MainLayout activeTab={activeTab} setActiveTab={setActiveTab} profile={profile} onLogout={handleLogout}>
-      {/* Vistas Dinámicas */}
+      
+      {/* Vistas Ventas / Caja / Gerencia */}
       {activeTab === 'dashboard' && <Dashboard />}
       {activeTab === 'pos' && <PuntoVenta />}
       {activeTab === 'historial' && <Historial />}
       {activeTab === 'clientes' && <Clientes />}
       
+      {/* Vistas Almacén */}
+      {activeTab === 'almacen-dashboard' && <AlmacenDashboard />}
+      {activeTab === 'inventario' && <Inventario />}
+      {activeTab === 'kardex-entrada' && <KardexEntrada />}
+      {activeTab === 'kardex-salida' && <KardexSalida />}
+
       {/* Modales globales */}
       <ModalVenta />
       <ModalCliente />
