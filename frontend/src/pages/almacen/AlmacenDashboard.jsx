@@ -1,6 +1,6 @@
 import { Package, ArrowDownLeft, ArrowUpRight, AlertCircle, Search, Bell } from 'lucide-react';
 
-const Dashboard = () => {
+const AlmacenDashboard = () => {
   const styles = {
     container: {
       backgroundColor: '#f8f9fa',
@@ -343,4 +343,4 @@ const Dashboard = () => {
   );
 };
 
-export default Dashboard;
+export default AlmacenDashboard;

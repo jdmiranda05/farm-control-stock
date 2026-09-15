@@ -1,6 +1,6 @@
 import { Home, ArrowDownLeft, ArrowUpRight, Package } from 'lucide-react';
 
-export default function Sidebar({ activeTab, setActiveTab }) {
+export default function AlmacenSidebar({ activeTab, setActiveTab }) {
   
   const getMenuItemStyle = (itemName) => {
     const isActive = activeTab === itemName;
