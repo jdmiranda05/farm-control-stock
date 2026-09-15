@@ -9,5 +9,9 @@
   },
   "devDependencies": {
     "concurrently": "^9.2.1"
+  },
+  "dependencies": {
+    "save-dev": "^0.0.1-security",
+    "vitest": "^5.0.1"
   }
 }
