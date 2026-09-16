@@ -1,8 +1,10 @@
-import { Body, Controller, Get, Post } from '@nestjs/common';
+import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
 import { CreateLoteEntradaDto } from './dto/create-lote-entrada.dto.js';
 import { LotesService } from './lotes.service.js';
+import { SupabaseAuthGuard } from '../supabase/supabase-auth.guard.js';
 
 @Controller('api/lotes')
+@UseGuards(SupabaseAuthGuard)
 export class LotesController {
   constructor(private readonly lotesService: LotesService) {}
 
