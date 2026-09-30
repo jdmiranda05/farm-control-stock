@@ -23,3 +23,10 @@ pnpm-debug.log*
 .idea/
 .DS_Store
 Thumbs.db
+# Entornos privados y cache TypeScript
+.env.*
+!.env.ejemplo
+*.tsbuildinfo
+
+.pnpm-store/
+*.local.json

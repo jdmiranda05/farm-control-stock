@@ -1,12 +1,16 @@
 import { Controller, Get } from '@nestjs/common';
-import { AppService } from './app.service.js';
+import { Publico } from './autenticacion/decoradores/publico.decorator';
 
+/** Endpoint de salud: permite verificar que la API está en línea. */
 @Controller()
 export class AppController {
-  constructor(private readonly appService: AppService) {}
-
-  @Get()
-  getHello(): string {
-    return this.appService.getHello();
+  @Publico()
+  @Get('salud')
+  salud() {
+    return {
+      estado: 'en línea',
+      servicio: 'API SaaS Boticas',
+      fecha: new Date().toISOString(),
+    };
   }
 }
