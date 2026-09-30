@@ -1,0 +1,14 @@
+{
+  "name": "@botica/comun",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Tipos, enumeraciones y utilidades compartidas entre el frontend y el backend",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3"
+  }
+}
