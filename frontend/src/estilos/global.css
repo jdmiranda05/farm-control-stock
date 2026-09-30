@@ -1,0 +1,7 @@
+/* Tailwind CSS v4: una sola importación habilita todas las utilidades. */
+@import "tailwindcss";
+
+/* Ajustes globales mínimos del proyecto. */
+body {
+  @apply bg-gray-100 text-gray-900 antialiased;
+}
