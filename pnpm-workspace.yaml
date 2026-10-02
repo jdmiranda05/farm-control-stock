@@ -1,0 +1,9 @@
+# Monorepo con pnpm workspaces:
+#  - apps/      → aplicaciones ejecutables (frontend y backend)
+#  - packages/  → código compartido entre aplicaciones
+packages:
+  - "apps/*"
+  - "packages/*"
+# Permite el script de instalación de esbuild (necesario para Vite)
+allowBuilds:
+  esbuild: true

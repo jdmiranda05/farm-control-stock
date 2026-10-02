@@ -1,27 +1,18 @@
 # Dependencias
 node_modules/
 
-# Archivos de construcción / producción
+# Compilados
 dist/
 build/
-.next/
-out/
-backend/.env
+*.tsbuildinfo
 
-# Variables de entorno y llaves secretas
+# Variables de entorno (NUNCA subir claves reales al repositorio)
 .env
 .env.local
 .env.*.local
 
-
-# Logs
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-
-# Archivos de configuración del editor e imágenes del sistema
-.vscode/
-.idea/
+# Sistema operativo / editores
 .DS_Store
 Thumbs.db
+.vscode/
+.idea/
