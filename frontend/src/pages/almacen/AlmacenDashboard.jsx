@@ -1,5 +1,6 @@
 import { Package, ArrowDownLeft, ArrowUpRight, AlertCircle, Search, Bell } from 'lucide-react';
 
+// Dashborad para rol Almacen
 const AlmacenDashboard = () => {
   const styles = {
     container: {
