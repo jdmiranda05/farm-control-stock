@@ -1,5 +1,6 @@
 import { Search, Bell, ChevronDown } from 'lucide-react';
 
+// 
 const Inventario = () => {
   const styles = {
     container: {
