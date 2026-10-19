@@ -67,7 +67,7 @@ export function InicioSesion() {
               required
               value={correo}
               onChange={(e) => setCorreo(e.target.value)}
-              placeholder="admin@sanrafael.pe"
+              placeholder="admin@botica.pe"
               className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
             />
           </div>
@@ -105,7 +105,7 @@ export function InicioSesion() {
         </form>
 
         <p className="mt-6 text-center text-xs text-gray-400">
-          Proyecto Universitario · Sistema SaaS Multi-tenant · 2026
+          Proyecto Universitario · Sistema Boticas · 2026
         </p>
       </div>
     </div>
