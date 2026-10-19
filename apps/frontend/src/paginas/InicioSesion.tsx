@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
-import { Cross, LoaderCircle, TriangleAlert } from 'lucide-react';
+import { Cross, Eye, EyeOff, LoaderCircle, TriangleAlert } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAutenticacion } from '../contexto/ContextoAutenticacion';
 
@@ -14,6 +14,7 @@ export function InicioSesion() {
   const navegar = useNavigate();
   const [correo, setCorreo] = useState('');
   const [contrasena, setContrasena] = useState('');
+  const [mostrarContrasena, setMostrarContrasena] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
 
@@ -43,7 +44,7 @@ export function InicioSesion() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-emerald-600 via-emerald-700 to-slate-900 p-4">
+    <div className="inicio-sesion sistema-theme flex min-h-screen items-center justify-center p-4">
       <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-2xl">
         {/* Logotipo y título */}
         <div className="mb-8 text-center">
@@ -76,15 +77,32 @@ export function InicioSesion() {
             <label htmlFor="contrasena" className="mb-1 block text-sm font-medium text-gray-700">
               Contraseña
             </label>
-            <input
-              id="contrasena"
-              type="password"
-              required
-              value={contrasena}
-              onChange={(e) => setContrasena(e.target.value)}
-              placeholder="••••••••"
-              className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
-            />
+            <div className="relative">
+              <input
+                id="contrasena"
+                type={mostrarContrasena ? 'text' : 'password'}
+                autoComplete="current-password"
+                required
+                value={contrasena}
+                onChange={(e) => setContrasena(e.target.value)}
+                placeholder="••••••••"
+                className="w-full rounded-lg border border-gray-300 py-2.5 pl-3 pr-12 text-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
+              />
+              <button
+                type="button"
+                onClick={() => setMostrarContrasena((mostrar) => !mostrar)}
+                aria-label={mostrarContrasena ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                aria-controls="contrasena"
+                title={mostrarContrasena ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                className="absolute inset-y-0 right-0 flex w-12 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 active:scale-[0.98]"
+              >
+                {mostrarContrasena ? (
+                  <EyeOff className="h-5 w-5" aria-hidden="true" />
+                ) : (
+                  <Eye className="h-5 w-5" aria-hidden="true" />
+                )}
+              </button>
+            </div>
           </div>
 
           {error && (

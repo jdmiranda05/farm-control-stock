@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Bell, Building2, LogOut } from 'lucide-react';
+import { Bell, Building2, Cross, LogOut } from 'lucide-react';
 import type { ContadorAlertas } from '@botica/comun';
 import { useAutenticacion } from '../../contexto/ContextoAutenticacion';
 import { api } from '../../lib/api';
@@ -39,9 +39,15 @@ export function Encabezado() {
     .join('');
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-gray-200 bg-white px-6 shadow-sm">
+    <header className="encabezado-sistema sticky z-30 flex items-center justify-between bg-white">
+      <div className="marca-sistema flex items-center gap-2 text-emerald-700">
+        <span className="grid h-10 w-10 place-items-center rounded-full bg-emerald-600 text-white">
+          <Cross className="h-6 w-6" aria-hidden="true" />
+        </span>
+        <span className="text-lg font-semibold tracking-tight">Botica SaaS</span>
+      </div>
       {/* Botica actual (inquilino activo del SaaS) */}
-      <div className="flex items-center gap-3">
+      <div className="botica-encabezado flex items-center gap-3">
         <span className="grid h-9 w-9 place-items-center rounded-lg bg-emerald-50 text-emerald-600">
           <Building2 className="h-5 w-5" />
         </span>
@@ -62,7 +68,7 @@ export function Encabezado() {
         </p>
       )}
 
-      <div className="flex items-center gap-5">
+      <div className="acciones-encabezado flex items-center gap-5">
         {/* Centro de notificaciones */}
         <button
           onClick={() => navegar('/alertas')}

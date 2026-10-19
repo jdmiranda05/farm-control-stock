@@ -7,7 +7,7 @@ import { Encabezado } from './Encabezado';
  * Layout principal de la zona privada (requisito de navegación):
  *
  *  ┌────────────┬──────────────────────────────┐
- *  │            │  Encabezado (header sticky)  │
+ *  │            │  Encabezado sin scroll      │
  *  │  Sidebar   ├──────────────────────────────┤
  *  │  fija a    │                              │
  *  │  la izq.   │   Contenido de la página     │
@@ -19,20 +19,20 @@ import { Encabezado } from './Encabezado';
  * que cambia junto con el estado colapsada/expandida.
  */
 export function DisposicionPrincipal() {
-  const [colapsada, setColapsada] = useState(false);
+  const [colapsada, setColapsada] = useState(true);
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="sistema-theme disposicion-principal">
+      <Encabezado />
       <BarraLateral colapsada={colapsada} alternar={() => setColapsada((v) => !v)} />
 
       {/* El margen izquierdo sigue el ancho de la sidebar (w-64 ↔ w-20) */}
       <div
-        className={`flex min-h-screen flex-col transition-all duration-300 ${
-          colapsada ? 'ml-20' : 'ml-64'
+        className={`contenido-sistema flex flex-col ${
+          colapsada ? 'menu-compacto' : 'menu-amplio'
         }`}
       >
-        <Encabezado />
-        <main className="flex-1 p-6">
+        <main className="contenido-pagina flex-1">
           <Outlet />
         </main>
       </div>
