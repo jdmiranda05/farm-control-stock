@@ -3,6 +3,8 @@ import {
   BellRing,
   Boxes,
   CalendarClock,
+  ChevronDown,
+  ChevronUp,
   Coins,
   OctagonAlert,
   Package,
@@ -29,6 +31,7 @@ import { Cargando } from '../componentes/ui/Cargando';
 export function PanelControl() {
   const [resumen, setResumen] = useState<ResumenPanel | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [mostrarTodas, setMostrarTodas] = useState(false);
 
   useEffect(() => {
     api
@@ -105,6 +108,11 @@ export function PanelControl() {
           tono="rojo"
           descripcion="Pérdidas declaradas históricas"
         />
+      </div>
+      <div
+        id="metricas-adicionales"
+        className={mostrarTodas ? 'grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3' : 'hidden'}
+      >
         <TarjetaKpi
           titulo="Lotes por vencer"
           valor={kpis.lotesPorVencer}
@@ -126,6 +134,23 @@ export function PanelControl() {
           tono="gris"
           descripcion="Blísters disponibles (sin vencidos)"
         />
+      </div>
+
+      <div className="flex justify-center">
+        <button
+          type="button"
+          onClick={() => setMostrarTodas((mostrar) => !mostrar)}
+          aria-expanded={mostrarTodas}
+          aria-controls="metricas-adicionales"
+          className="flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+        >
+          {mostrarTodas ? 'Mostrar menos' : 'Mostrar más'}
+          {mostrarTodas ? (
+            <ChevronUp className="h-4 w-4" aria-hidden="true" />
+          ) : (
+            <ChevronDown className="h-4 w-4" aria-hidden="true" />
+          )}
+        </button>
       </div>
 
       {/* ══════ Productos que requieren atención ══════ */}

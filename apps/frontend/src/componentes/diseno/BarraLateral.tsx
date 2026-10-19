@@ -120,12 +120,12 @@ export function BarraLateral({ colapsada, alternar }: Props) {
 
   return (
     <aside
-      className={`fixed inset-y-0 left-0 z-40 flex flex-col bg-slate-900 text-slate-100 transition-all duration-300 ${
+      className={`menu-lateral fixed z-40 flex flex-col ${
         colapsada ? 'w-20' : 'w-64'
       }`}
     >
       {/* Logotipo del sistema */}
-      <div className="flex h-16 items-center gap-3 border-b border-slate-800 px-5">
+      <div className="marca-lateral flex h-16 items-center gap-3 px-5">
         <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-emerald-500 text-white">
           <Cross className="h-5 w-5" />
         </span>
@@ -144,12 +144,13 @@ export function BarraLateral({ colapsada, alternar }: Props) {
             key={ruta}
             to={ruta}
             end={exacto}
-            title={colapsada ? etiqueta : undefined}
+            aria-label={etiqueta}
+            title={etiqueta}
             className={({ isActive }) =>
               `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
                 isActive
                   ? 'bg-emerald-600 text-white'
-                  : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                  : 'text-gray-500 hover:bg-gray-100 hover:text-emerald-700'
               } ${colapsada ? 'justify-center' : ''}`
             }
           >
@@ -162,7 +163,8 @@ export function BarraLateral({ colapsada, alternar }: Props) {
       {/* Botón colapsar / expandir */}
       <button
         onClick={alternar}
-        className="flex items-center justify-center gap-2 border-t border-slate-800 py-3 text-sm text-slate-400 transition-colors hover:bg-slate-800 hover:text-white"
+        aria-label={colapsada ? 'Expandir menú' : 'Colapsar menú'}
+        className="alternar-menu flex items-center justify-center gap-2 py-3 text-sm text-gray-500 hover:bg-gray-100 hover:text-emerald-700"
       >
         {colapsada ? (
           <ChevronsRight className="h-5 w-5" />

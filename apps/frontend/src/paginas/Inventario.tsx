@@ -356,6 +356,16 @@ export function Inventario() {
           >
             {procesando === 'merma' ? 'Registrando…' : 'Registrar merma'}
           </button>
+          <div className="mt-4 flex items-start gap-3 rounded-xl bg-red-50 p-4">
+            <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-red-600" aria-hidden="true" />
+            <div>
+              <p className="text-sm font-medium text-gray-800">Antes de registrar</p>
+              <p className="mt-1 text-xs leading-5 text-gray-600">
+                Verifica el lote, la cantidad y la unidad de empaque. Describe el motivo
+                del retiro para facilitar su seguimiento en el Kardex.
+              </p>
+            </div>
+          </div>
         </form>
       </div>
 

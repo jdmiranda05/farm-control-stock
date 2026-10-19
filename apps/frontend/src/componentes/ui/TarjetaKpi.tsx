@@ -23,7 +23,7 @@ interface Props {
 export function TarjetaKpi({ titulo, valor, Icono, tono, descripcion }: Props) {
   const estilos = ESTILOS_TONO[tono];
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+    <div className={`tarjeta-kpi tarjeta-kpi-${tono} rounded-xl border border-gray-200 bg-white p-5 shadow-sm`}>
       <div className="flex items-start justify-between">
         <div>
           <p className="text-sm font-medium text-gray-500">{titulo}</p>
