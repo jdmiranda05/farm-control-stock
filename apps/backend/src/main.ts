@@ -31,8 +31,11 @@ async function iniciar() {
     credentials: true,
   });
 
-  const puerto = Number(process.env.PUERTO ?? 3000);
-  await app.listen(puerto);
+  const puerto = Number(
+    process.env.PORT ?? process.env.PUERTO ?? 3000
+  );
+
+  await app.listen(puerto, '0.0.0.0');
   Logger.log(`✅ API escuchando en http://localhost:${puerto}/api`, 'Arranque');
 }
 
