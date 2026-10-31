@@ -56,6 +56,18 @@ export function ProveedorAutenticacion({ children }: { children: ReactNode }) {
     return () => suscripcion.subscription.unsubscribe();
   }, []);
 
+  // Atrás/Adelante puede restaurar la página desde la caché del navegador
+  // (bfcache), conservando incluso el estado de React. Cerrar sesión al salir
+  // de la página evita que esa restauración vuelva a mostrar una sesión activa.
+  useEffect(() => {
+    const cerrarAlSalir = () => {
+      void supabase.auth.signOut({ scope: 'local' });
+    };
+
+    window.addEventListener('pagehide', cerrarAlSalir);
+    return () => window.removeEventListener('pagehide', cerrarAlSalir);
+  }, []);
+
   // 2) Con sesión activa → pedir el perfil de negocio al backend
   useEffect(() => {
     if (!sesion) return;
