@@ -24,4 +24,13 @@ export const supabaseConfigurado = Boolean(
 export const supabase = createClient(
   supabaseConfigurado ? url : 'https://sin-configurar.supabase.co',
   supabaseConfigurado ? claveAnon : 'clave-sin-configurar',
+  {
+    auth: {
+      // No persistir sesiones permite exigir credenciales en cada carga nueva.
+      // La sesión se mantiene en memoria mientras la aplicación sigue abierta.
+      persistSession: false,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+    },
+  },
 );
