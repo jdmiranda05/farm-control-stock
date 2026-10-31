@@ -17,6 +17,8 @@ export function InicioSesion() {
   const [mostrarContrasena, setMostrarContrasena] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
+  const [recuperando, setRecuperando] = useState(false);
+  const [mensaje, setMensaje] = useState<string | null>(null);
 
   // Si ya hay sesión activa, no tiene sentido mostrar el formulario
   if (sesion) return <Navigate to="/" replace />;
@@ -43,6 +45,27 @@ export function InicioSesion() {
     navegar('/');
   }
 
+  async function solicitarCambioContrasena() {
+    setError(null);
+    setMensaje(null);
+    if (!correo.trim()) {
+      setError('Ingresa tu correo electrónico para enviarte el enlace de recuperación');
+      return;
+    }
+
+    setRecuperando(true);
+    const { error: errorAuth } = await supabase.auth.resetPasswordForEmail(correo.trim(), {
+      redirectTo: `${window.location.origin}/cambiar-contrasena`,
+    });
+    setRecuperando(false);
+
+    if (errorAuth) {
+      setError(errorAuth.message);
+      return;
+    }
+    setMensaje('Si el correo está registrado, recibirás un enlace para cambiar tu contraseña.');
+  }
+
   return (
     <div className="inicio-sesion sistema-theme flex min-h-screen items-center justify-center p-4">
       <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-2xl">
@@ -51,7 +74,7 @@ export function InicioSesion() {
           <span className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-emerald-500 text-white">
             <Cross className="h-7 w-7" />
           </span>
-          <h1 className="text-2xl font-bold text-gray-900">Botica SaaS</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Botica</h1>
           <p className="mt-1 text-sm text-gray-500">
             Control de Inventario y Alertas para Boticas
           </p>
@@ -112,6 +135,12 @@ export function InicioSesion() {
             </p>
           )}
 
+          {mensaje && (
+            <p role="status" className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+              {mensaje}
+            </p>
+          )}
+
           <button
             type="submit"
             disabled={enviando}
@@ -120,6 +149,16 @@ export function InicioSesion() {
             {enviando && <LoaderCircle className="h-4 w-4 animate-spin" />}
             {enviando ? 'Ingresando…' : 'Iniciar sesión'}
           </button>
+          <div className="text-center">
+            <button
+              type="button"
+              onClick={solicitarCambioContrasena}
+              disabled={recuperando || enviando}
+              className="text-sm text-emerald-700 hover:underline disabled:opacity-60"
+            >
+              {recuperando ? 'Enviando enlace…' : '¿Olvidaste tu contraseña?'}
+            </button>
+          </div>
         </form>
 
         <p className="mt-6 text-center text-xs text-gray-400">

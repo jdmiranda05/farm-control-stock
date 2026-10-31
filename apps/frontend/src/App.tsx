@@ -4,6 +4,7 @@ import { RutaProtegida } from './componentes/diseno/RutaProtegida';
 import { RutaPorRol } from './componentes/diseno/RutaPorRol';
 import { DisposicionPrincipal } from './componentes/diseno/DisposicionPrincipal';
 import { InicioSesion } from './paginas/InicioSesion';
+import { CambiarContrasena } from './paginas/CambiarContrasena';
 import { PanelControl } from './paginas/PanelControl';
 import { PuntoVenta } from './paginas/PuntoVenta';
 import { Productos } from './paginas/Productos';
@@ -39,6 +40,7 @@ export default function App() {
         <Routes>
           {/* Página pública de inicio de sesión */}
           <Route path="/inicio-sesion" element={<InicioSesion />} />
+          <Route path="/cambiar-contrasena" element={<CambiarContrasena />} />
 
           {/* Zona privada: exige sesión activa */}
           <Route
