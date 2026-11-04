@@ -1,0 +1,26 @@
+# ============================================================================
+#  REDIRECCION PARA APLICACION DE UNA SOLA PAGINA (SPA)
+#
+#  El problema que resuelve:
+#    Las rutas /productos, /kardex o /inicio-sesion no existen como archivos
+#    en el servidor: las crea React Router dentro del navegador. Al navegar
+#    con el menu nunca se consulta al servidor, pero al RECARGAR (F5) o pegar
+#    la URL, el navegador si le pide esa ruta a Netlify, que no encuentra
+#    ningun archivo y responde con su pagina "Page not found".
+#
+#  Como funciona la regla:
+#    Netlify sirve primero cualquier archivo que exista de verdad (el
+#    index.html y los .js y .css de /assets). Solo cuando la ruta pedida no
+#    corresponde a ningun archivo aplica esta linea y entrega index.html.
+#    Asi el JavaScript carga, React Router lee la direccion y muestra la
+#    pantalla correcta.
+#
+#  El codigo 200 es importante: entrega el contenido manteniendo la URL que
+#  el usuario pidio. Con un 301 el navegador saltaria a la raiz y se perderia
+#  la pantalla a la que se queria entrar.
+#
+#  Este archivo vive en public/ porque Vite copia esa carpeta tal cual a
+#  dist/ durante la compilacion, que es lo que Netlify publica.
+# ============================================================================
+
+/*    /index.html   200
