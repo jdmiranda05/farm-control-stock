@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { Categoria, Producto, ProductoConStock } from '@botica/comun';
+import { Categoria, Producto, ProductoConStock, validarEmpaque } from '@botica/comun';
 import { SupabaseService } from '../supabase/supabase.service';
 import { CrearProductoDto } from './dto/crear-producto.dto';
 import { ActualizarProductoDto } from './dto/actualizar-producto.dto';
@@ -61,18 +61,51 @@ export class ProductosService {
     return data as Producto;
   }
 
+  /**
+   * Normaliza y valida el empaque (caja / blíster) con las reglas compartidas
+   * de @botica/comun. Un producto SIN blísters se guarda con 1 unidad por
+   * caja y con el precio por blíster igual al de la unidad.
+   */
+  private normalizarEmpaque(datos: {
+    tieneBlisters?: boolean;
+    unidadesPorCaja: number;
+    precioCaja: number;
+    precioBlister?: number;
+  }) {
+    const conBlisters = datos.tieneBlisters ?? datos.unidadesPorCaja > 1;
+    const empaque = {
+      tieneBlisters: conBlisters,
+      unidadesPorCaja: conBlisters ? datos.unidadesPorCaja : 1,
+      precioCaja: Number(datos.precioCaja),
+      precioBlister: conBlisters ? Number(datos.precioBlister ?? 0) : Number(datos.precioCaja),
+    };
+    const errores = validarEmpaque(empaque);
+    if (errores.length > 0) throw new BadRequestException(errores);
+    return empaque;
+  }
+
+  /** Limpia textos opcionales: "  " -> null. */
+  private texto(valor: string | undefined | null): string | null {
+    const limpio = valor?.trim();
+    return limpio ? limpio : null;
+  }
+
   async crear(boticaId: string, dto: CrearProductoDto): Promise<Producto> {
+    const nombre = dto.nombre.trim();
+    if (!nombre) throw new BadRequestException('El nombre del producto es obligatorio');
+    const empaque = this.normalizarEmpaque(dto);
+
     // Traducción camelCase (API) -> snake_case (tabla `productos`)
     const registro = {
       botica_id: boticaId,
-      codigo: dto.codigo ?? null,
-      nombre: dto.nombre,
+      codigo: this.texto(dto.codigo),
+      nombre,
       categoria_id: dto.categoriaId ?? null,
-      presentacion: dto.presentacion ?? null,
-      laboratorio: dto.laboratorio ?? null,
-      unidades_por_caja: dto.unidadesPorCaja,
-      precio_caja: dto.precioCaja,
-      precio_blister: dto.precioBlister,
+      presentacion: this.texto(dto.presentacion),
+      laboratorio: this.texto(dto.laboratorio),
+      unidades_por_caja: empaque.unidadesPorCaja,
+      precio_caja: empaque.precioCaja,
+      precio_blister: empaque.precioBlister,
       stock_minimo: dto.stockMinimo,
       requiere_receta: dto.requiereReceta ?? false,
     };
@@ -96,18 +129,43 @@ export class ProductosService {
     productoId: string,
     dto: ActualizarProductoDto,
   ): Promise<Producto> {
-    await this.obtenerPorId(boticaId, productoId); // valida pertenencia al tenant
+    const actual = await this.obtenerPorId(boticaId, productoId); // valida pertenencia al tenant
 
     const cambios: Record<string, unknown> = {};
-    if (dto.codigo !== undefined) cambios.codigo = dto.codigo;
-    if (dto.nombre !== undefined) cambios.nombre = dto.nombre;
-    if (dto.categoriaId !== undefined) cambios.categoria_id = dto.categoriaId;
-    if (dto.presentacion !== undefined) cambios.presentacion = dto.presentacion;
-    if (dto.laboratorio !== undefined) cambios.laboratorio = dto.laboratorio;
-    if (dto.unidadesPorCaja !== undefined) cambios.unidades_por_caja = dto.unidadesPorCaja;
-    if (dto.precioCaja !== undefined) cambios.precio_caja = dto.precioCaja;
-    if (dto.precioBlister !== undefined) cambios.precio_blister = dto.precioBlister;
+    if (dto.codigo !== undefined) cambios.codigo = this.texto(dto.codigo);
+    if (dto.nombre !== undefined) {
+      const nombre = dto.nombre.trim();
+      if (!nombre) throw new BadRequestException('El nombre del producto es obligatorio');
+      cambios.nombre = nombre;
+    }
+    if (dto.categoriaId !== undefined) cambios.categoria_id = dto.categoriaId || null;
+    if (dto.presentacion !== undefined) cambios.presentacion = this.texto(dto.presentacion);
+    if (dto.laboratorio !== undefined) cambios.laboratorio = this.texto(dto.laboratorio);
     if (dto.stockMinimo !== undefined) cambios.stock_minimo = dto.stockMinimo;
+
+    // Empaque: se valida combinando lo enviado con lo que ya está guardado.
+    const tocaEmpaque =
+      dto.tieneBlisters !== undefined ||
+      dto.unidadesPorCaja !== undefined ||
+      dto.precioCaja !== undefined ||
+      dto.precioBlister !== undefined;
+    if (tocaEmpaque) {
+      const empaque = this.normalizarEmpaque({
+        tieneBlisters: dto.tieneBlisters ?? (dto.unidadesPorCaja ?? actual.unidades_por_caja) > 1,
+        unidadesPorCaja: dto.unidadesPorCaja ?? actual.unidades_por_caja,
+        precioCaja: dto.precioCaja ?? Number(actual.precio_caja),
+        precioBlister: dto.precioBlister ?? Number(actual.precio_blister),
+      });
+
+      // Cambiar el número de blísters por caja con mercadería en almacén
+      // alteraría el stock ya registrado (cajas * unidades + sueltos).
+      if (empaque.unidadesPorCaja !== actual.unidades_por_caja) {
+        await this.verificarSinExistencias(boticaId, productoId, actual.nombre);
+      }
+      cambios.unidades_por_caja = empaque.unidadesPorCaja;
+      cambios.precio_caja = empaque.precioCaja;
+      cambios.precio_blister = empaque.precioBlister;
+    }
     if (dto.requiereReceta !== undefined) cambios.requiere_receta = dto.requiereReceta;
     if (Object.keys(cambios).length === 0) {
       throw new BadRequestException('No se envió ningún campo para actualizar');
@@ -120,8 +178,31 @@ export class ProductosService {
       .eq('id', productoId)
       .select()
       .single();
+    if (error?.code === '23505') {
+      throw new BadRequestException(`Ya existe un producto con el código "${dto.codigo}"`);
+    }
     this.supabase.verificarError(error, 'actualizar el producto');
     return data as Producto;
+  }
+
+  /** Impide cambiar el empaque si el producto todavía tiene stock en lotes. */
+  private async verificarSinExistencias(boticaId: string, productoId: string, nombre: string) {
+    const { data: lotes, error } = await this.supabase.cliente
+      .from('lotes')
+      .select('cajas_completas, blisters_sueltos')
+      .eq('botica_id', boticaId)
+      .eq('producto_id', productoId);
+    this.supabase.verificarError(error, 'verificar el stock del producto');
+
+    const conStock = (lotes ?? []).some(
+      (lote) => lote.cajas_completas > 0 || lote.blisters_sueltos > 0,
+    );
+    if (conStock) {
+      throw new BadRequestException(
+        `No se puede cambiar el empaque (blísters por caja) de "${nombre}" porque ` +
+          'todavía tiene mercadería en almacén. Agote o dé de baja su stock primero.',
+      );
+    }
   }
 
   /**
@@ -163,14 +244,22 @@ export class ProductosService {
   // CATEGORÍAS
   // ============================================================
 
-  async listarCategorias(boticaId: string): Promise<Categoria[]> {
+  /**
+   * Categorías de la botica. Por defecto solo las activas; con
+   * `incluirInactivas` también las deshabilitadas (panel del ADMIN).
+   */
+  async listarCategorias(boticaId: string, incluirInactivas = false): Promise<Categoria[]> {
     const { data, error } = await this.supabase.cliente
       .from('categorias')
       .select('*')
       .eq('botica_id', boticaId)
       .order('nombre');
     this.supabase.verificarError(error, 'listar categorías');
-    return (data ?? []) as Categoria[];
+    const categorias = ((data ?? []) as Categoria[]).map((c) => ({
+      ...c,
+      activa: c.activa ?? true, // sin migración aplicada, todas cuentan como activas
+    }));
+    return incluirInactivas ? categorias : categorias.filter((c) => c.activa);
   }
 
   async crearCategoria(boticaId: string, dto: CrearCategoriaDto): Promise<Categoria> {
@@ -178,59 +267,127 @@ export class ProductosService {
       .from('categorias')
       .insert({
         botica_id: boticaId,
-        nombre: dto.nombre,
-        descripcion: dto.descripcion ?? null,
+        nombre: dto.nombre.trim(),
+        descripcion: this.texto(dto.descripcion),
       })
       .select()
       .single();
 
     if (error?.code === '23505') {
-      throw new BadRequestException(`Ya existe la categoría "${dto.nombre}" en esta botica`);
+      const { data: existente } = await this.supabase.cliente
+        .from('categorias')
+        .select('*')
+        .eq('botica_id', boticaId)
+        .eq('nombre', dto.nombre.trim())
+        .maybeSingle();
+      throw new BadRequestException(
+        existente?.activa === false
+          ? `La categoría "${dto.nombre.trim()}" existe pero está deshabilitada: ` +
+              'un administrador puede reactivarla.'
+          : `Ya existe la categoría "${dto.nombre.trim()}" en esta botica`,
+      );
     }
     this.supabase.verificarError(error, 'crear la categoría');
     return data as Categoria;
   }
 
-  /**
-   * ELIMINAR una categoría. Operación reservada al rol ADMIN.
-   * No se borran los productos que la usaban: por la regla
-   * `on delete set null` del esquema, simplemente quedan "sin categoría".
-   * Se avisa cuántos productos quedarán así para que la decisión sea informada.
-   */
-  async eliminarCategoria(
+  /** Renombrar una categoría. Operación reservada al rol ADMIN. */
+  async actualizarCategoria(
     boticaId: string,
     categoriaId: string,
-  ): Promise<{ mensaje: string; productosAfectados: number }> {
-    const { data: categoria } = await this.supabase.cliente
+    dto: CrearCategoriaDto,
+  ): Promise<Categoria> {
+    const { data, error } = await this.supabase.cliente
+      .from('categorias')
+      .update({ nombre: dto.nombre.trim(), descripcion: this.texto(dto.descripcion) })
+      .eq('botica_id', boticaId)
+      .eq('id', categoriaId)
+      .select()
+      .maybeSingle();
+
+    if (error?.code === '23505') {
+      throw new BadRequestException(`Ya existe la categoría "${dto.nombre.trim()}" en esta botica`);
+    }
+    this.supabase.verificarError(error, 'actualizar la categoría');
+    if (!data) throw new NotFoundException('Categoría no encontrada en esta botica');
+    return data as Categoria;
+  }
+
+  /** Verdadero si el error indica que falta la columna `activa` (migración pendiente). */
+  private faltaColumnaActiva(error: { code?: string; message?: string } | null): boolean {
+    return (
+      !!error &&
+      (error.code === '42703' || error.code === 'PGRST204' || /activa/.test(error.message ?? ''))
+    );
+  }
+
+  private async buscarCategoria(boticaId: string, categoriaId: string): Promise<Categoria> {
+    const { data } = await this.supabase.cliente
       .from('categorias')
       .select('*')
       .eq('botica_id', boticaId)
       .eq('id', categoriaId)
       .maybeSingle();
-    if (!categoria) throw new NotFoundException('Categoría no encontrada en esta botica');
+    if (!data) throw new NotFoundException('Categoría no encontrada en esta botica');
+    return data as Categoria;
+  }
 
-    // ¿Cuántos productos quedarán sin categoría?
+  /** Cambia el estado de la categoría; explica cómo migrar si falta la columna. */
+  private async cambiarEstadoCategoria(boticaId: string, categoriaId: string, activa: boolean) {
+    const { error } = await this.supabase.cliente
+      .from('categorias')
+      .update({ activa })
+      .eq('botica_id', boticaId)
+      .eq('id', categoriaId);
+    if (this.faltaColumnaActiva(error)) {
+      throw new BadRequestException(
+        'Falta aplicar la migración de categorías: ejecute ' +
+          'supabase/migracion-categorias-activa.sql en el SQL Editor de Supabase.',
+      );
+    }
+    this.supabase.verificarError(error, 'cambiar el estado de la categoría');
+  }
+
+  /**
+   * DESHABILITAR una categoría (baja lógica). Operación reservada al ADMIN.
+   * Ya no se borra: los productos conservan su categoría y el ADMIN puede
+   * reactivarla. Solo deja de ofrecerse al registrar productos nuevos.
+   */
+  async desactivarCategoria(
+    boticaId: string,
+    categoriaId: string,
+  ): Promise<{ mensaje: string; productosAfectados: number }> {
+    const categoria = await this.buscarCategoria(boticaId, categoriaId);
+    if (categoria.activa === false) {
+      throw new BadRequestException(`La categoría "${categoria.nombre}" ya está deshabilitada`);
+    }
+
     const { count } = await this.supabase.cliente
       .from('productos')
       .select('id', { count: 'exact', head: true })
       .eq('botica_id', boticaId)
       .eq('categoria_id', categoriaId);
 
-    const { error } = await this.supabase.cliente
-      .from('categorias')
-      .delete()
-      .eq('botica_id', boticaId)
-      .eq('id', categoriaId);
-    this.supabase.verificarError(error, 'eliminar la categoría');
+    await this.cambiarEstadoCategoria(boticaId, categoriaId, false);
 
     const productosAfectados = count ?? 0;
     return {
       mensaje:
-        `Categoría "${categoria.nombre}" eliminada.` +
+        `Categoría "${categoria.nombre}" deshabilitada.` +
         (productosAfectados > 0
-          ? ` ${productosAfectados} producto(s) quedaron sin categoría.`
-          : ''),
+          ? ` ${productosAfectados === 1 ? "El producto que la usa la conserva" : `Los ${productosAfectados} productos que la usan la conservan`}; puede reactivarla cuando quiera.`
+          : ' Puede reactivarla cuando quiera.'),
       productosAfectados,
     };
+  }
+
+  /** REACTIVAR una categoría deshabilitada. Operación reservada al ADMIN. */
+  async reactivarCategoria(boticaId: string, categoriaId: string): Promise<{ mensaje: string }> {
+    const categoria = await this.buscarCategoria(boticaId, categoriaId);
+    if (categoria.activa !== false) {
+      throw new BadRequestException(`La categoría "${categoria.nombre}" ya está activa`);
+    }
+    await this.cambiarEstadoCategoria(boticaId, categoriaId, true);
+    return { mensaje: `Categoría "${categoria.nombre}" reactivada.` };
   }
 }

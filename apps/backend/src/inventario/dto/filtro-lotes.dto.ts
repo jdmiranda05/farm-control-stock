@@ -14,4 +14,9 @@ export class FiltroLotesDto extends PaginacionDto {
   @IsOptional()
   @IsBooleanString({ message: 'soloVencidos debe ser "true" o "false"' })
   soloVencidos?: string;
+
+  /** "true" para listar solo los lotes que todavía tienen mercadería. */
+  @IsOptional()
+  @IsBooleanString({ message: 'soloConStock debe ser "true" o "false"' })
+  soloConStock?: string;
 }

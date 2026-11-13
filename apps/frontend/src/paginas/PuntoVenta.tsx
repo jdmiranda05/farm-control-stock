@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Check,
   CircleAlert,
+  FileCheck2,
   Package,
   PackageOpen,
   Plus,
@@ -16,11 +17,43 @@ import {
   formatearFecha,
   formatearSoles,
   formatearStock,
+  tieneBlisters,
+  textoCantidad,
   type ProductoConStock,
   type ResultadoVenta,
 } from '@botica/comun';
 import { api } from '../lib/api';
-import { Cargando } from '../componentes/ui/Cargando';
+import { EsqueletoPuntoVenta } from '../componentes/ui/Esqueleto';
+import { ControlSegmentado } from '../componentes/ui/ControlSegmentado';
+import { useConfirmacion } from '../componentes/ui/DialogoConfirmacion';
+
+/** Nombre de la modalidad para un producto concreto ("Unidad" si no tiene blísters). */
+function nombreModalidad(producto: ProductoConStock, modalidad: UnidadEmpaque): string {
+  if (modalidad === UnidadEmpaque.BLISTER) return 'Blíster';
+  return tieneBlisters(producto) ? 'Caja' : 'Unidad';
+}
+
+/**
+ * Máximo que se puede vender de un producto en una modalidad, descontando lo
+ * que ya está en el carrito en la otra modalidad (comparten el mismo stock).
+ */
+function maximoDisponible(
+  producto: ProductoConStock,
+  modalidad: UnidadEmpaque,
+  carrito: LineaCarrito[],
+): number {
+  const porCaja = Math.max(producto.unidades_por_caja, 1);
+  const enOtraModalidad = carrito
+    .filter((l) => l.producto.id === producto.id && l.modalidad !== modalidad)
+    .reduce(
+      (suma, l) => suma + (l.modalidad === UnidadEmpaque.CAJA ? l.cantidad * porCaja : l.cantidad),
+      0,
+    );
+  const libres = Math.max(producto.stock_blisters - enOtraModalidad, 0);
+  return modalidad === UnidadEmpaque.CAJA
+    ? Math.min(producto.cajas_disponibles, Math.floor(libres / porCaja))
+    : libres;
+}
 
 /** Una línea del carrito, ya valorizada en el navegador. */
 interface LineaCarrito {
@@ -51,6 +84,7 @@ export function PuntoVenta() {
   const [error, setError] = useState<string | null>(null);
   const [comprobante, setComprobante] = useState<ResultadoVenta | null>(null);
   const campoBusqueda = useRef<HTMLInputElement>(null);
+  const { confirmar, dialogo } = useConfirmacion();
 
   function cargarProductos() {
     api
@@ -82,8 +116,14 @@ export function PuntoVenta() {
   const total = carrito.reduce((suma, linea) => suma + linea.precioUnitario * linea.cantidad, 0);
 
   /** Agrega un producto al carrito con la modalidad seleccionada. */
-  function agregar(producto: ProductoConStock) {
+  async function agregar(producto: ProductoConStock) {
     setError(null);
+
+    // Un producto sin blísters (frasco, jarabe…) solo se vende entero.
+    if (modalidad === UnidadEmpaque.BLISTER && !tieneBlisters(producto)) {
+      setError(`"${producto.nombre}" no tiene blísters: véndalo en la modalidad "Por caja / unidad".`);
+      return;
+    }
     const precioUnitario =
       modalidad === UnidadEmpaque.CAJA
         ? Number(producto.precio_caja)
@@ -102,6 +142,31 @@ export function PuntoVenta() {
       return;
     }
 
+    const enCarrito =
+      carrito.find((l) => l.producto.id === producto.id && l.modalidad === modalidad)?.cantidad ?? 0;
+    const maximo = maximoDisponible(producto, modalidad, carrito);
+    if (enCarrito + 1 > maximo) {
+      setError(
+        `Stock insuficiente: solo hay ${textoCantidad(maximo, modalidad, producto)} ` +
+          `de "${producto.nombre}" disponibles.`,
+      );
+      return;
+    }
+
+    // Medicamento con receta: el vendedor confirma que la verificó (solo la
+    // primera vez que entra al carrito en esta venta).
+    const yaVerificado = carrito.some((l) => l.producto.id === producto.id);
+    if (producto.requiere_receta && !yaVerificado) {
+      const verificada = await confirmar({
+        titulo: `"${producto.nombre}" requiere receta médica`,
+        mensaje: 'Antes de agregarlo, verifique que el cliente presente una receta válida y vigente.',
+        accion: 'Receta verificada',
+        tono: 'exito',
+        Icono: FileCheck2,
+      });
+      if (!verificada) return;
+    }
+
     setCarrito((actual) => {
       // Si el producto ya está en el carrito con la misma modalidad, se suma.
       const indice = actual.findIndex(
@@ -118,10 +183,22 @@ export function PuntoVenta() {
     campoBusqueda.current?.focus();
   }
 
-  function cambiarCantidad(indice: number, cantidad: number) {
-    if (cantidad < 1) return;
+  function cambiarCantidad(indice: number, valor: string) {
+    const cantidad = Math.floor(Number(valor));
+    if (!Number.isFinite(cantidad) || cantidad < 1) return;
+    const linea = carrito[indice];
+    const maximo = maximoDisponible(linea.producto, linea.modalidad, carrito);
+    if (cantidad > maximo) {
+      setError(
+        `Solo hay ${textoCantidad(maximo, linea.modalidad, linea.producto)} ` +
+          `de "${linea.producto.nombre}" disponibles.`,
+      );
+    } else {
+      setError(null);
+    }
+    const ajustada = Math.min(cantidad, Math.max(maximo, 1));
     setCarrito((actual) =>
-      actual.map((linea, i) => (i === indice ? { ...linea, cantidad } : linea)),
+      actual.map((l, i) => (i === indice ? { ...l, cantidad: ajustada } : l)),
     );
   }
 
@@ -152,14 +229,14 @@ export function PuntoVenta() {
     }
   }
 
-  if (!productos) return <Cargando mensaje="Cargando catálogo…" />;
+  if (!productos) return <EsqueletoPuntoVenta />;
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Punto de Venta</h1>
         <p className="text-sm text-gray-500">
-          Busque el medicamento, elija caja o blíster y complete la venta
+          Busque el medicamento, elija caja/unidad o blíster y complete la venta
         </p>
       </div>
 
@@ -175,34 +252,34 @@ export function PuntoVenta() {
         <div className="space-y-4 lg:col-span-3">
           {/* Selector de modalidad de venta */}
           <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-500">
-              Modalidad de venta
-            </p>
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                onClick={() => setModalidad(UnidadEmpaque.CAJA)}
-                className={`flex items-center justify-center gap-2 rounded-lg border-2 px-4 py-3 text-sm font-semibold transition ${
-                  modalidad === UnidadEmpaque.CAJA
-                    ? 'border-emerald-600 bg-emerald-50 text-emerald-700'
-                    : 'border-gray-200 text-gray-500 hover:border-gray-300'
-                }`}
-              >
-                <Package className="h-5 w-5" /> Por caja
-              </button>
-              <button
-                onClick={() => setModalidad(UnidadEmpaque.BLISTER)}
-                className={`flex items-center justify-center gap-2 rounded-lg border-2 px-4 py-3 text-sm font-semibold transition ${
-                  modalidad === UnidadEmpaque.BLISTER
-                    ? 'border-blue-600 bg-blue-50 text-blue-700'
-                    : 'border-gray-200 text-gray-500 hover:border-gray-300'
-                }`}
-              >
-                <PackageOpen className="h-5 w-5" /> Por blíster
-              </button>
-            </div>
+            <p className="mb-2.5 text-[13px] font-semibold text-gray-500">Modalidad de venta</p>
+            <ControlSegmentado
+              etiquetaAccesible="Modalidad de venta"
+              valor={modalidad}
+              alCambiar={setModalidad}
+              opciones={[
+                {
+                  valor: UnidadEmpaque.CAJA,
+                  etiqueta: (
+                    <>
+                      <Package className="h-4 w-4 text-emerald-600" /> Por caja / unidad
+                    </>
+                  ),
+                },
+                {
+                  valor: UnidadEmpaque.BLISTER,
+                  etiqueta: (
+                    <>
+                      <PackageOpen className="h-4 w-4 text-blue-600" /> Por blíster
+                    </>
+                  ),
+                },
+              ]}
+            />
             {modalidad === UnidadEmpaque.BLISTER && (
-              <p className="mt-2 text-xs text-blue-600">
-                Si no hay blísters sueltos, el sistema abrirá una caja automáticamente.
+              <p className="aparecer mt-2.5 text-xs text-blue-700">
+                Si no hay blísters sueltos, el sistema abrirá una caja automáticamente. Los
+                productos sin blísters (frascos, jarabes…) solo se venden por unidad.
               </p>
             )}
           </div>
@@ -244,11 +321,16 @@ export function PuntoVenta() {
                     : Number(producto.precio_blister);
                 const sinCajas =
                   modalidad === UnidadEmpaque.CAJA && producto.cajas_disponibles === 0;
+                const sinBlisters =
+                  modalidad === UnidadEmpaque.BLISTER && !tieneBlisters(producto);
+                const bloqueado = sinCajas || sinBlisters;
 
                 return (
                   <li
                     key={producto.id}
-                    className="flex items-center justify-between gap-4 px-4 py-3 hover:bg-gray-50"
+                    className={`flex items-center justify-between gap-4 px-4 py-3 transition-colors hover:bg-gray-50 ${
+                      bloqueado ? 'opacity-60' : ''
+                    }`}
                   >
                     <div className="min-w-0">
                       <p className="truncate font-medium text-gray-900">
@@ -269,13 +351,28 @@ export function PuntoVenta() {
                     </div>
 
                     <div className="flex shrink-0 items-center gap-3">
-                      <span className="text-sm font-semibold text-gray-800">
-                        {formatearSoles(precio)}
+                      <span className="text-right text-sm font-semibold text-gray-800">
+                        {sinBlisters ? (
+                          <span className="text-xs font-medium text-gray-400">Solo por unidad</span>
+                        ) : (
+                          <>
+                            {formatearSoles(precio)}
+                            <span className="block text-[10px] font-normal text-gray-400">
+                              por {nombreModalidad(producto, modalidad).toLowerCase()}
+                            </span>
+                          </>
+                        )}
                       </span>
                       <button
                         onClick={() => agregar(producto)}
-                        disabled={sinCajas}
-                        title={sinCajas ? 'Sin cajas cerradas disponibles' : 'Agregar'}
+                        disabled={bloqueado}
+                        title={
+                          sinBlisters
+                            ? 'Este producto no tiene blísters'
+                            : sinCajas
+                              ? 'Sin cajas cerradas disponibles'
+                              : 'Agregar'
+                        }
                         className="flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-40"
                       >
                         <Plus className="h-3.5 w-3.5" /> Agregar
@@ -310,14 +407,14 @@ export function PuntoVenta() {
             ) : (
               <ul className="divide-y divide-gray-50">
                 {carrito.map((linea, indice) => (
-                  <li key={`${linea.producto.id}-${linea.modalidad}`} className="px-5 py-3">
+                  <li key={`${linea.producto.id}-${linea.modalidad}`} className="aparecer px-5 py-3">
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
                         <p className="truncate text-sm font-medium text-gray-900">
                           {linea.producto.nombre}
                         </p>
                         <p className="text-xs text-gray-500">
-                          {linea.modalidad === UnidadEmpaque.CAJA ? 'Caja' : 'Blíster'} ·{' '}
+                          {nombreModalidad(linea.producto, linea.modalidad)} ·{' '}
                           {formatearSoles(linea.precioUnitario)} c/u
                         </p>
                       </div>
@@ -333,8 +430,11 @@ export function PuntoVenta() {
                       <input
                         type="number"
                         min="1"
+                        step="1"
+                        max={maximoDisponible(linea.producto, linea.modalidad, carrito)}
+                        aria-label={`Cantidad de ${linea.producto.nombre}`}
                         value={linea.cantidad}
-                        onChange={(e) => cambiarCantidad(indice, Number(e.target.value))}
+                        onChange={(e) => cambiarCantidad(indice, e.target.value)}
                         className="w-20 rounded-lg border border-gray-300 px-2 py-1 text-sm outline-none focus:border-emerald-500"
                       />
                       <span className="text-sm font-semibold text-gray-800">
@@ -428,6 +528,7 @@ export function PuntoVenta() {
           </div>
         </div>
       )}
+      {dialogo}
     </div>
   );
 }

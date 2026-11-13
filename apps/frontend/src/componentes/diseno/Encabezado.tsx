@@ -29,7 +29,12 @@ export function Encabezado() {
 
     consultar();
     const intervalo = setInterval(consultar, 60_000);
-    return () => clearInterval(intervalo);
+    // La pantalla de Alertas avisa cuando las recalcula o las marca como vistas
+    window.addEventListener('alertas-actualizadas', consultar);
+    return () => {
+      clearInterval(intervalo);
+      window.removeEventListener('alertas-actualizadas', consultar);
+    };
   }, [perfil, ubicacion.pathname]);
 
   const iniciales = (perfil?.nombre_completo ?? '?')
@@ -73,11 +78,14 @@ export function Encabezado() {
         <button
           onClick={() => navegar('/alertas')}
           title="Ver alertas"
-          className="relative rounded-full p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700"
+          aria-label={`Ver alertas (${contador.activas} activas)`}
+          className={`relative rounded-full p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 ${
+            contador.noLeidas > 0 ? 'campana-activa' : ''
+          }`}
         >
           <Bell className="h-5 w-5" />
           {contador.activas > 0 && (
-            <span className="absolute -right-0.5 -top-0.5 grid h-5 min-w-5 place-items-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+            <span className="absolute -right-0.5 -top-0.5 grid h-5 min-w-5 aparecer place-items-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
               {contador.activas > 99 ? '99+' : contador.activas}
             </span>
           )}

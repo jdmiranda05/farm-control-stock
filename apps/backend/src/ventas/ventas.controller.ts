@@ -8,8 +8,8 @@ import { PaginacionDto } from '../comun/dto/paginacion.dto';
 
 /**
  * Endpoints del punto de venta.
- * Los usa el rol VENDEDOR (y el ADMIN, que tiene control total);
- * el ALMACENERO trabaja en el módulo de inventario, no en caja.
+ * Registrar ventas es exclusivo del VENDEDOR: el ADMIN solo cumple
+ * funciones administrativas y el ALMACENERO trabaja en el almacén.
  */
 @Controller('ventas')
 export class VentasController {

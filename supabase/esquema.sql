@@ -28,7 +28,8 @@
 -- ============================================================
 
 -- Los TRES roles del sistema (RBAC):
---   ADMIN      -> control total: configuración, reactivar productos, corregir kardex
+--   ADMIN      -> funciones administrativas: catálogo, configuración, reactivar
+--                 productos, corregir kardex (no vende ni opera el almacén)
 --   ALMACENERO -> entradas manuales de mercadería, lotes, proveedores y merma
 --   VENDEDOR   -> solo el punto de venta (POS): consulta stock y vende
 create type rol_usuario as enum ('ADMIN', 'ALMACENERO', 'VENDEDOR');
@@ -111,6 +112,8 @@ create table categorias (
   botica_id    uuid not null references boticas (id) on delete cascade,
   nombre       text not null,
   descripcion  text,
+  -- Baja lógica: el ADMIN la deshabilita (false) y puede reactivarla.
+  activa       boolean not null default true,
   creado_en    timestamptz not null default now(),
   constraint uq_categoria_por_botica unique (botica_id, nombre)
 );

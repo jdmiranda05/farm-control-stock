@@ -12,8 +12,8 @@ import { FiltroLotesDto } from './dto/filtro-lotes.dto';
  *
  * Permisos:
  *   - Consultar lotes      -> cualquier rol (el vendedor necesita ver stock)
- *   - Entradas manuales    -> ALMACENERO (y ADMIN)
- *   - Declarar mermas      -> ALMACENERO (y ADMIN)
+ *   - Entradas manuales    -> solo ALMACENERO
+ *   - Declarar mermas      -> solo ALMACENERO
  */
 @Controller('inventario')
 export class InventarioController {

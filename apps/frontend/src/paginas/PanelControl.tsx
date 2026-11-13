@@ -15,12 +15,21 @@ import {
   formatearFecha,
   formatearSoles,
   formatearStock,
+  diasParaVencer,
+  nombreUnidadMinima,
   type ResumenPanel,
 } from '@botica/comun';
 import { api } from '../lib/api';
 import { TarjetaKpi } from '../componentes/ui/TarjetaKpi';
 import { EtiquetaEstado } from '../componentes/ui/EtiquetaEstado';
-import { Cargando } from '../componentes/ui/Cargando';
+import { EsqueletoPanel } from '../componentes/ui/Esqueleto';
+
+/** "vence hoy" / "en 1 día" / "hace 3 días": días calculados con la fecha LOCAL. */
+function textoDias(dias: number): string {
+  if (dias === 0) return 'vence hoy';
+  if (dias < 0) return `venció hace ${-dias} día${dias === -1 ? '' : 's'}`;
+  return `en ${dias} día${dias === 1 ? '' : 's'}`;
+}
 
 /**
  * DASHBOARD (pantalla principal de ADMIN y ALMACENERO):
@@ -52,7 +61,7 @@ export function PanelControl() {
     );
   }
 
-  if (!resumen) return <Cargando mensaje="Cargando métricas…" />;
+  if (!resumen) return <EsqueletoPanel />;
 
   const { kpis, productosAtencion } = resumen;
 
@@ -79,7 +88,7 @@ export function PanelControl() {
           valor={kpis.totalProductos}
           Icono={Package}
           tono="azul"
-          descripcion={`${kpis.blistersEnStock} blíster(es) en stock`}
+          descripcion={`${kpis.blistersEnStock} blísters o unidades en stock`}
         />
         <TarjetaKpi
           titulo="Alertas activas"
@@ -195,7 +204,7 @@ export function PanelControl() {
                         {formatearStock(producto.stock_blisters, producto.unidades_por_caja)}
                       </p>
                       <p className="text-xs text-gray-400">
-                        mínimo: {producto.stock_minimo}
+                        mínimo: {producto.stock_minimo} {nombreUnidadMinima(producto)}
                       </p>
                     </td>
                     <td className="px-5 py-3">
@@ -204,7 +213,8 @@ export function PanelControl() {
                     <td className="px-5 py-3 text-center">
                       {producto.blisters_vencidos > 0 ? (
                         <span className="font-semibold text-red-600">
-                          {producto.blisters_vencidos}
+                          {producto.blisters_vencidos}{' '}
+                          <span className="text-xs font-normal">{nombreUnidadMinima(producto)}</span>
                         </span>
                       ) : (
                         <span className="text-gray-300">0</span>
@@ -214,11 +224,9 @@ export function PanelControl() {
                       {producto.proxima_fecha_vencimiento ? (
                         <>
                           {formatearFecha(producto.proxima_fecha_vencimiento)}
-                          {producto.dias_para_vencer !== null && (
-                            <span className="ml-1 text-xs text-gray-400">
-                              (en {producto.dias_para_vencer} días)
-                            </span>
-                          )}
+                          <span className="ml-1 text-xs text-gray-400">
+                            ({textoDias(diasParaVencer(producto.proxima_fecha_vencimiento))})
+                          </span>
                         </>
                       ) : (
                         '—'

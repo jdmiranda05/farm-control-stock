@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { Save } from 'lucide-react';
 import type { Botica } from '@botica/comun';
 import { api } from '../lib/api';
-import { Cargando } from '../componentes/ui/Cargando';
+import { EsqueletoConfiguracion } from '../componentes/ui/Esqueleto';
 
 /**
  * Página "Configuración de la Botica".
@@ -65,7 +65,7 @@ export function Configuracion() {
   if (error && !botica) {
     return <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>;
   }
-  if (!botica) return <Cargando mensaje="Cargando configuración…" />;
+  if (!botica) return <EsqueletoConfiguracion />;
 
   return (
     <div className="max-w-2xl space-y-6">

@@ -12,6 +12,8 @@ import {
   TipoMovimientoKardex,
   UnidadEmpaque,
   formatearSoles,
+  pluralizar,
+  textoCantidad,
   hoyIso,
   type ReporteDiario as ReporteDiarioTipo,
   type ResumenMerma,
@@ -19,7 +21,7 @@ import {
 import { api } from '../lib/api';
 import { TarjetaKpi } from '../componentes/ui/TarjetaKpi';
 import { Paginacion } from '../componentes/ui/Paginacion';
-import { Cargando } from '../componentes/ui/Cargando';
+import { EsqueletoReporte } from '../componentes/ui/Esqueleto';
 
 /** Etiqueta legible de cada tipo de movimiento. */
 const ETIQUETA_TIPO: Record<TipoMovimientoKardex, { texto: string; clases: string }> = {
@@ -85,7 +87,9 @@ export function ReporteDiario() {
     const hoy = new Date();
     const inicio = new Date();
     inicio.setDate(hoy.getDate() - dias);
-    const aTexto = (fecha: Date) => fecha.toISOString().slice(0, 10);
+    // Fecha local (no UTC): en Perú, después de las 7 p. m. UTC ya es "mañana"
+    const aTexto = (fecha: Date) =>
+      new Date(fecha.getTime() - fecha.getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
     setDesde(aTexto(inicio));
     setHasta(aTexto(hoy));
     setPagina(1);
@@ -94,7 +98,7 @@ export function ReporteDiario() {
   if (error) {
     return <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>;
   }
-  if (!reporte) return <Cargando mensaje="Generando reporte…" />;
+  if (!reporte) return <EsqueletoReporte />;
 
   const { kpis, movimientos } = reporte;
   const esUnSoloDia = reporte.desde === reporte.hasta;
@@ -175,17 +179,17 @@ export function ReporteDiario() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <TarjetaKpi
           titulo="Ingresado"
-          valor={`${kpis.cajasIngresadas} caja(s)`}
+          valor={pluralizar(kpis.cajasIngresadas, 'empaque', 'empaques')}
           Icono={ArrowDownToLine}
           tono="verde"
-          descripcion={`${kpis.blistersIngresados} blíster(es) en total`}
+          descripcion={`Cajas o frascos · ${kpis.blistersIngresados} blísters o unidades en total`}
         />
         <TarjetaKpi
           titulo="Retirado"
-          valor={`${kpis.blistersRetirados} blíster(es)`}
+          valor={pluralizar(kpis.blistersRetirados, 'unidad', 'unidades')}
           Icono={ArrowUpFromLine}
           tono="azul"
-          descripcion={`${kpis.blistersVendidos} por venta · ${kpis.blistersMerma} por merma`}
+          descripcion={`Blísters o unidades: ${kpis.blistersVendidos} por venta · ${kpis.blistersMerma} por merma`}
         />
         <TarjetaKpi
           titulo="Comprobantes emitidos"
@@ -282,7 +286,10 @@ export function ReporteDiario() {
                           </span>
                           <span className="text-xs text-gray-400">
                             {' '}
-                            {movimiento.unidad === UnidadEmpaque.CAJA ? 'caja(s)' : 'blíster(es)'}
+                            {textoCantidad(movimiento.cantidad, movimiento.unidad, movimiento.producto)
+                              .split(' ')
+                              .slice(1)
+                              .join(' ')}
                           </span>
                         </td>
                         <td className="px-5 py-3 text-gray-600">

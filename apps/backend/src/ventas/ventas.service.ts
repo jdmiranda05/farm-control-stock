@@ -85,6 +85,13 @@ export class VentasService {
         );
       }
 
+      // Un producto sin blísters (frasco, jarabe…) solo se vende por unidad.
+      if (linea.modalidad === UnidadEmpaque.BLISTER && producto.unidades_por_caja <= 1) {
+        throw new BadRequestException(
+          `"${producto.nombre}" no se vende por blíster: solo por unidad completa.`,
+        );
+      }
+
       // El precio depende de la modalidad elegida por el vendedor.
       const precioUnitario =
         linea.modalidad === UnidadEmpaque.CAJA

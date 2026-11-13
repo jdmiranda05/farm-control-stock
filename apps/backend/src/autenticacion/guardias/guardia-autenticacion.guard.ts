@@ -44,6 +44,14 @@ export class GuardiaAutenticacion implements CanActivate {
     }
     const token = encabezado.slice('Bearer '.length);
 
+    // Caché breve: una misma pantalla dispara varias peticiones seguidas con
+    // el mismo token; validarlo cada vez contra Supabase sumaba ~1 s a cada una.
+    const enCache = this.cache.get(token);
+    if (enCache && enCache.expira > Date.now()) {
+      peticion.usuario = enCache.perfil;
+      return true;
+    }
+
     // 3) Validar el JWT contra Supabase Auth
     const { data, error } = await this.supabase.cliente.auth.getUser(token);
     if (error || !data.user) {
@@ -69,6 +77,23 @@ export class GuardiaAutenticacion implements CanActivate {
 
     // 5) Adjuntar el perfil a la petición para el resto de la cadena
     peticion.usuario = perfil as PerfilUsuario;
+    this.guardarEnCache(token, perfil as PerfilUsuario);
     return true;
+  }
+
+  /**
+   * Token -> perfil validado durante TTL_CACHE_MS. Un cambio de rol o una
+   * desactivación tarda como máximo ese tiempo en aplicarse.
+   */
+  private readonly cache = new Map<string, { perfil: PerfilUsuario; expira: number }>();
+  private static readonly TTL_CACHE_MS = 30_000;
+
+  private guardarEnCache(token: string, perfil: PerfilUsuario) {
+    const ahora = Date.now();
+    // Limpieza simple para que el mapa no crezca sin límite
+    if (this.cache.size > 500) {
+      for (const [clave, valor] of this.cache) if (valor.expira <= ahora) this.cache.delete(clave);
+    }
+    this.cache.set(token, { perfil, expira: ahora + GuardiaAutenticacion.TTL_CACHE_MS });
   }
 }

@@ -18,8 +18,8 @@ import { ActualizarProveedorDto } from './dto/actualizar-proveedor.dto';
 
 /**
  * Endpoints de proveedores.
- * Los gestiona el ALMACENERO (y el ADMIN, que tiene control total);
- * el VENDEDOR no necesita esta información para operar el POS.
+ * Los gestiona solo el ADMIN (registrar, editar, dar de baja y reactivar).
+ * El ALMACENERO los consulta para registrar entradas; el VENDEDOR no los usa.
  */
 @Controller('proveedores')
 export class ProveedoresController {
@@ -35,14 +35,14 @@ export class ProveedoresController {
   }
 
   /** POST /api/proveedores — registrar un proveedor nuevo. */
-  @Roles(RolUsuario.ALMACENERO)
+  @Roles(RolUsuario.ADMIN)
   @Post()
   crear(@UsuarioActual() usuario: PerfilUsuario, @Body() dto: CrearProveedorDto) {
     return this.servicio.crear(usuario.botica_id, dto);
   }
 
   /** PATCH /api/proveedores/:id — actualizar datos de contacto. */
-  @Roles(RolUsuario.ALMACENERO)
+  @Roles(RolUsuario.ADMIN)
   @Patch(':id')
   actualizar(
     @UsuarioActual() usuario: PerfilUsuario,
@@ -60,5 +60,15 @@ export class ProveedoresController {
     @Param('id', ParseUUIDPipe) id: string,
   ) {
     return this.servicio.desactivar(usuario.botica_id, id);
+  }
+
+  /** PATCH /api/proveedores/:id/reactivar — devolver un proveedor dado de baja. */
+  @Roles(RolUsuario.ADMIN)
+  @Patch(':id/reactivar')
+  reactivar(
+    @UsuarioActual() usuario: PerfilUsuario,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.servicio.reactivar(usuario.botica_id, id);
   }
 }

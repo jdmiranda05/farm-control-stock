@@ -1,13 +1,8 @@
-import { useCallback, useEffect, useState } from 'react';
-import { CalendarClock, Check, Eye, OctagonAlert, RefreshCw, TrendingDown } from 'lucide-react';
-import {
-  EstadoAlerta,
-  TipoAlerta,
-  type AlertaDetallada,
-  type ResumenGeneracionAlertas,
-} from '@botica/comun';
+import { useEffect, useRef, useState } from 'react';
+import { CalendarClock, CircleCheck, OctagonAlert, RefreshCw, TrendingDown } from 'lucide-react';
+import { EstadoAlerta, TipoAlerta, type AlertaDetallada } from '@botica/comun';
 import { api } from '../lib/api';
-import { Cargando } from '../componentes/ui/Cargando';
+import { EsqueletoAlertas, EsqueletoLista } from '../componentes/ui/Esqueleto';
 
 /** Apariencia de cada tipo de alerta en el listado. */
 const ESTILO_TIPO = {
@@ -28,56 +23,82 @@ const ESTILO_TIPO = {
   },
 } as const;
 
+/** Las alertas en pantalla se refrescan solas cada minuto. */
+const INTERVALO_REFRESCO_MS = 60_000;
+
 /**
  * Página "Alertas": centro de notificaciones del sistema.
- * Permite filtrar por estado/tipo, forzar el recálculo del motor de alertas
- * y gestionar cada alerta (marcar leída / resolver).
+ *
+ * Las alertas son AUTOMÁTICAS: al entrar a esta pantalla el backend
+ * recalcula el motor de alertas contra el inventario actual (y lo repite
+ * cada minuto mientras la pantalla esté abierta). Una alerta desaparece
+ * sola cuando su causa se corrige: llega mercadería, se vende el lote o se
+ * registra la merma. Por eso no hay botones para "resolver" a mano.
  */
 export function Alertas() {
   const [alertas, setAlertas] = useState<AlertaDetallada[] | null>(null);
   const [filtroEstado, setFiltroEstado] = useState<string>(EstadoAlerta.ACTIVA);
   const [filtroTipo, setFiltroTipo] = useState<string>('');
-  const [recalculando, setRecalculando] = useState(false);
-  const [resumen, setResumen] = useState<ResumenGeneracionAlertas | null>(null);
+  const [actualizando, setActualizando] = useState(false);
+  const [actualizadoEn, setActualizadoEn] = useState<Date | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const primeraCarga = useRef(true);
 
-  const cargar = useCallback(() => {
-    const parametros = new URLSearchParams();
-    if (filtroEstado) parametros.set('estado', filtroEstado);
-    if (filtroTipo) parametros.set('tipo', filtroTipo);
+  useEffect(() => {
+    let cancelado = false;
 
-    api
-      .get<AlertaDetallada[]>(`/alertas?${parametros.toString()}`)
-      .then(setAlertas)
-      .catch((e: Error) => setError(e.message));
+    const consulta = (recalcular: boolean) => {
+      const parametros = new URLSearchParams();
+      if (recalcular) parametros.set('recalcular', 'true');
+      if (filtroEstado) parametros.set('estado', filtroEstado);
+      if (filtroTipo) parametros.set('tipo', filtroTipo);
+      return api.get<AlertaDetallada[]>(`/alertas?${parametros.toString()}`);
+    };
+
+    async function cargar() {
+      setActualizando(true);
+
+      // 1) Lo guardado aparece al instante (sin esperar el recálculo)…
+      const recalculada = consulta(true);
+      consulta(false)
+        .then((rapida) => {
+          if (!cancelado) setAlertas((actual) => actual ?? rapida);
+        })
+        .catch(() => undefined);
+
+      // 2) …y se reemplaza por la lista recalculada en cuanto llega.
+      try {
+        const lista = await recalculada;
+        if (cancelado) return;
+        setAlertas(lista);
+        setActualizadoEn(new Date());
+        setError(null);
+
+        // Al verlas, las alertas activas dejan de ser "nuevas"
+        if (lista.some((a) => a.estado === EstadoAlerta.ACTIVA && !a.leida)) {
+          await api.patch('/alertas/vistas').catch(() => undefined);
+        }
+        window.dispatchEvent(new Event('alertas-actualizadas'));
+      } catch (e) {
+        if (!cancelado) setError((e as Error).message);
+      } finally {
+        if (!cancelado) setActualizando(false);
+        primeraCarga.current = false;
+      }
+    }
+
+    void cargar();
+    const intervalo = setInterval(cargar, INTERVALO_REFRESCO_MS);
+    return () => {
+      cancelado = true;
+      clearInterval(intervalo);
+    };
   }, [filtroEstado, filtroTipo]);
 
-  useEffect(cargar, [cargar]);
+  // Primera visita: esqueleto de toda la pantalla
+  if (!alertas && !error) return <EsqueletoAlertas />;
 
-  /** Fuerza el recálculo (misma lógica que ejecuta el cron cada hora). */
-  async function recalcular() {
-    setRecalculando(true);
-    setError(null);
-    try {
-      const resultado = await api.post<ResumenGeneracionAlertas>('/alertas/generar');
-      setResumen(resultado);
-      cargar();
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setRecalculando(false);
-    }
-  }
-
-  async function marcarLeida(alerta: AlertaDetallada) {
-    await api.patch(`/alertas/${alerta.id}/leida`).catch((e: Error) => setError(e.message));
-    cargar();
-  }
-
-  async function resolver(alerta: AlertaDetallada) {
-    await api.patch(`/alertas/${alerta.id}/resolver`).catch((e: Error) => setError(e.message));
-    cargar();
-  }
+  const activas = alertas?.filter((a) => a.estado === EstadoAlerta.ACTIVA).length ?? 0;
 
   return (
     <div className="space-y-6">
@@ -85,41 +106,47 @@ export function Alertas() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Alertas</h1>
           <p className="text-sm text-gray-500">
-            Stock mínimo y vencimientos — se recalculan automáticamente cada hora
+            Stock mínimo y vencimientos — se actualizan automáticamente al ingresar y cada
+            minuto
           </p>
         </div>
-        <button
-          onClick={recalcular}
-          disabled={recalculando}
-          className="flex items-center gap-2 rounded-lg bg-slate-800 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:opacity-60"
+        <p
+          className="flex items-center gap-2 rounded-full bg-white px-4 py-2 text-xs text-gray-500 shadow-sm"
+          aria-live="polite"
         >
-          <RefreshCw className={`h-4 w-4 ${recalculando ? 'animate-spin' : ''}`} />
-          Recalcular ahora
-        </button>
+          <RefreshCw
+            className={`h-3.5 w-3.5 text-emerald-600 ${actualizando ? 'animate-spin' : ''}`}
+            aria-hidden="true"
+          />
+          {actualizando
+            ? 'Actualizando…'
+            : actualizadoEn
+              ? `Actualizado a las ${actualizadoEn.toLocaleTimeString('es-PE', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })}`
+              : 'Sin actualizar'}
+        </p>
       </div>
 
-      {resumen && (
-        <p className="rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-          Recalculo completado: {resumen.creadas} creadas · {resumen.actualizadas} actualizadas ·{' '}
-          {resumen.resueltas} resueltas · {resumen.vigentes} vigentes.
-        </p>
-      )}
       {error && <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
 
       {/* Filtros */}
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <select
           value={filtroEstado}
           onChange={(e) => setFiltroEstado(e.target.value)}
+          aria-label="Filtrar por estado"
           className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500"
         >
           <option value="">Todos los estados</option>
           <option value={EstadoAlerta.ACTIVA}>Activas</option>
-          <option value={EstadoAlerta.RESUELTA}>Resueltas</option>
+          <option value={EstadoAlerta.RESUELTA}>Resueltas (historial)</option>
         </select>
         <select
           value={filtroTipo}
           onChange={(e) => setFiltroTipo(e.target.value)}
+          aria-label="Filtrar por tipo"
           className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500"
         >
           <option value="">Todos los tipos</option>
@@ -127,26 +154,32 @@ export function Alertas() {
           <option value={TipoAlerta.VENCIMIENTO_PROXIMO}>Vencimiento próximo</option>
           <option value={TipoAlerta.VENCIDO}>Vencido</option>
         </select>
+        {alertas && filtroEstado !== EstadoAlerta.RESUELTA && (
+          <span className="text-sm text-gray-500">
+            {activas} alerta{activas === 1 ? '' : 's'} activa{activas === 1 ? '' : 's'}
+          </span>
+        )}
       </div>
 
       {/* Listado de alertas */}
       {!alertas ? (
-        <Cargando mensaje="Cargando alertas…" />
+        <EsqueletoLista />
       ) : alertas.length === 0 ? (
-        <div className="rounded-xl border border-gray-200 bg-white p-10 text-center shadow-sm">
-          <p className="text-sm text-emerald-600">
-            🟢 No hay alertas con los filtros seleccionados.
+        <div className="aparecer rounded-xl border border-gray-200 bg-white p-10 text-center shadow-sm">
+          <CircleCheck className="mx-auto h-10 w-10 text-emerald-500" />
+          <p className="mt-3 text-sm text-emerald-700">
+            No hay alertas con los filtros seleccionados.
           </p>
         </div>
       ) : (
-        <ul className="space-y-3">
+        <ul className={`space-y-3 ${primeraCarga.current ? 'lista-animada' : ''}`}>
           {alertas.map((alerta) => {
             const estilo = ESTILO_TIPO[alerta.tipo];
             const activa = alerta.estado === EstadoAlerta.ACTIVA;
             return (
               <li
                 key={alerta.id}
-                className={`flex items-start gap-4 rounded-xl border bg-white p-4 shadow-sm ${
+                className={`flex items-start gap-4 rounded-xl border bg-white p-4 shadow-sm transition-shadow hover:shadow-md ${
                   activa ? 'border-gray-200' : 'border-gray-100 opacity-70'
                 }`}
               >
@@ -166,7 +199,7 @@ export function Alertas() {
                     )}
                     {!activa && (
                       <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-bold text-gray-500">
-                        RESUELTA
+                        RESUELTA AUTOMÁTICAMENTE
                       </span>
                     )}
                   </div>
@@ -176,29 +209,17 @@ export function Alertas() {
                       dateStyle: 'medium',
                       timeStyle: 'short',
                     })}
+                    {!activa && alerta.resuelto_en && (
+                      <>
+                        {' · resuelta el '}
+                        {new Date(alerta.resuelto_en).toLocaleString('es-PE', {
+                          dateStyle: 'medium',
+                          timeStyle: 'short',
+                        })}
+                      </>
+                    )}
                   </p>
                 </div>
-
-                {activa && (
-                  <div className="flex shrink-0 gap-2">
-                    {!alerta.leida && (
-                      <button
-                        onClick={() => marcarLeida(alerta)}
-                        title="Marcar como leída"
-                        className="flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
-                      >
-                        <Eye className="h-3.5 w-3.5" /> Leída
-                      </button>
-                    )}
-                    <button
-                      onClick={() => resolver(alerta)}
-                      title="Resolver manualmente"
-                      className="flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
-                    >
-                      <Check className="h-3.5 w-3.5" /> Resolver
-                    </button>
-                  </div>
-                )}
               </li>
             );
           })}

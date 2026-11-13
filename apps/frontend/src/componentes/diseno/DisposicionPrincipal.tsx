@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import { BarraLateral } from './BarraLateral';
 import { Encabezado } from './Encabezado';
 
@@ -20,6 +20,7 @@ import { Encabezado } from './Encabezado';
  */
 export function DisposicionPrincipal() {
   const [colapsada, setColapsada] = useState(true);
+  const { pathname } = useLocation();
 
   return (
     <div className="sistema-theme disposicion-principal">
@@ -33,7 +34,10 @@ export function DisposicionPrincipal() {
         }`}
       >
         <main className="contenido-pagina flex-1">
-          <Outlet />
+          {/* La clave por ruta reinicia la animación de entrada en cada página */}
+          <div key={pathname} className="transicion-pagina">
+            <Outlet />
+          </div>
         </main>
       </div>
     </div>

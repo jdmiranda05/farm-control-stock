@@ -4,12 +4,14 @@ import {
   TipoMovimientoKardex,
   UnidadEmpaque,
   formatearSoles,
+  formatearStock,
+  textoCantidad,
   type MovimientoDetallado,
   type ProductoConStock,
   type RespuestaPaginada,
 } from '@botica/comun';
 import { api } from '../lib/api';
-import { Cargando } from '../componentes/ui/Cargando';
+import { EsqueletoKardex, EsqueletoTabla } from '../componentes/ui/Esqueleto';
 import { Paginacion } from '../componentes/ui/Paginacion';
 import { useAutenticacion } from '../contexto/ContextoAutenticacion';
 import { esAdmin } from '../lib/permisos';
@@ -60,6 +62,7 @@ export function Kardex() {
   const [hasta, setHasta] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [mensaje, setMensaje] = useState<string | null>(null);
+  const [cargando, setCargando] = useState(false);
 
   // Estado del modal de corrección (solo ADMIN)
   const [corrigiendo, setCorrigiendo] = useState<MovimientoDetallado | null>(null);
@@ -72,10 +75,25 @@ export function Kardex() {
     if (desde) parametros.set('desde', desde);
     if (hasta) parametros.set('hasta', hasta);
 
+    if (desde && hasta && desde > hasta) {
+      setError('La fecha "desde" no puede ser posterior a la fecha "hasta"');
+      return;
+    }
+    setCargando(true);
     api
       .get<RespuestaPaginada<MovimientoDetallado>>(`/kardex?${parametros}`)
-      .then(setMovimientos)
-      .catch((e: Error) => setError(e.message));
+      .then((datos) => {
+        setMovimientos(datos);
+        setError(null);
+      })
+      .catch((e: Error) => {
+        setError(e.message);
+        setMovimientos(
+          (actual) =>
+            actual ?? { datos: [], total: 0, pagina: 1, porPagina: 10, totalPaginas: 0 },
+        );
+      })
+      .finally(() => setCargando(false));
   }, [pagina, filtroTipo, desde, hasta]);
 
   const cargarInactivos = useCallback(() => {
@@ -133,6 +151,8 @@ export function Kardex() {
     }
   }
 
+  if (!movimientos) return <EsqueletoKardex />;
+
   return (
     <div className="space-y-6">
       <div>
@@ -168,7 +188,8 @@ export function Kardex() {
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium text-gray-900">{producto.nombre}</p>
                   <p className="text-xs text-gray-500">
-                    {producto.codigo ?? 'sin código'} · {producto.stock_blisters} blíster(es) en stock
+                    {producto.codigo ?? 'sin código'} ·{' '}
+                    {formatearStock(producto.stock_blisters, producto.unidades_por_caja)} en stock
                   </p>
                 </div>
                 <button
@@ -243,8 +264,10 @@ export function Kardex() {
 
       {/* ══════ Tabla de movimientos ══════ */}
       <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
-        {!movimientos ? (
-          <Cargando mensaje="Cargando historial…" />
+        {!movimientos || cargando ? (
+          <div className="p-3">
+            <EsqueletoTabla filas={6} columnas={6} />
+          </div>
         ) : movimientos.datos.length === 0 ? (
           <p className="px-5 py-10 text-center text-sm text-gray-500">
             No hay movimientos con los filtros seleccionados.
@@ -314,7 +337,10 @@ export function Kardex() {
                           </span>
                           <span className="text-xs text-gray-400">
                             {' '}
-                            {movimiento.unidad === UnidadEmpaque.CAJA ? 'caja(s)' : 'blíster(es)'}
+                            {textoCantidad(movimiento.cantidad, movimiento.unidad, movimiento.producto)
+                              .split(' ')
+                              .slice(1)
+                              .join(' ')}
                           </span>
                         </td>
                         <td className="px-5 py-3 text-gray-600">

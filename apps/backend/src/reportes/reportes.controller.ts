@@ -19,14 +19,14 @@ export class ReportesController {
    * GET /api/reportes/diario?desde=&hasta=&pagina=&porPagina=
    * Sin fechas devuelve el reporte del día actual.
    */
-  @Roles(RolUsuario.ALMACENERO)
+  @Roles(RolUsuario.ALMACENERO, RolUsuario.ADMIN)
   @Get('diario')
   diario(@UsuarioActual() usuario: PerfilUsuario, @Query() filtros: FiltroReporteDto) {
     return this.servicio.reporteDiario(usuario.botica_id, filtros);
   }
 
   /** GET /api/reportes/merma — pérdidas económicas acumuladas en soles. */
-  @Roles(RolUsuario.ALMACENERO)
+  @Roles(RolUsuario.ALMACENERO, RolUsuario.ADMIN)
   @Get('merma')
   merma(@UsuarioActual() usuario: PerfilUsuario) {
     return this.servicio.reporteMerma(usuario.botica_id);

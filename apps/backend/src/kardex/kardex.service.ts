@@ -47,7 +47,7 @@ export class KardexService {
    * "more than one relationship was found".
    */
   private readonly SELECCION_DETALLADA =
-    '*, producto:productos(nombre, codigo, activo), lote:lotes(numero_lote, fecha_vencimiento), ' +
+    '*, producto:productos(nombre, codigo, activo, unidades_por_caja), lote:lotes(numero_lote, fecha_vencimiento), ' +
     'proveedor:proveedores(nombre), usuario:usuarios!usuario_id(nombre_completo)';
 
   constructor(private readonly supabase: SupabaseService) {}

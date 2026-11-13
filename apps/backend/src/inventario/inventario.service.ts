@@ -6,6 +6,7 @@ import {
   TipoMovimientoKardex,
   UnidadEmpaque,
   formatearFecha,
+  hoyIso,
 } from '@botica/comun';
 import { SupabaseService } from '../supabase/supabase.service';
 import { KardexService } from '../kardex/kardex.service';
@@ -38,7 +39,7 @@ export class InventarioService {
     filtros: FiltroLotesDto,
   ): Promise<RespuestaPaginada<LoteDetallado>> {
     const { pagina, porPagina, desde, hasta } = calcularRango(filtros);
-    const hoy = new Date().toISOString().slice(0, 10);
+    const hoy = hoyIso(); // fecha local, no UTC
 
     let consulta = this.supabase.cliente
       .from('lotes')
@@ -50,6 +51,9 @@ export class InventarioService {
 
     if (filtros.productoId) consulta = consulta.eq('producto_id', filtros.productoId);
     if (filtros.soloVencidos === 'true') consulta = consulta.lt('fecha_vencimiento', hoy);
+    if (filtros.soloConStock === 'true') {
+      consulta = consulta.or('cajas_completas.gt.0,blisters_sueltos.gt.0');
+    }
 
     const { data, error, count } = await consulta
       // Orden FEFO también en la pantalla: lo que vence antes se ve primero.
@@ -92,6 +96,13 @@ export class InventarioService {
       throw new BadRequestException(
         `El producto "${producto.nombre}" está desactivado. ` +
           'Un administrador debe reactivarlo antes de recibir mercadería.',
+      );
+    }
+
+    // No se recibe mercadería vencida ni que vence hoy
+    if (dto.fechaVencimiento.slice(0, 10) <= hoyIso()) {
+      throw new BadRequestException(
+        'La fecha de vencimiento debe ser posterior a hoy: no se recibe mercadería vencida.',
       );
     }
 
@@ -208,6 +219,11 @@ export class InventarioService {
     if (!lote) throw new NotFoundException('Lote no encontrado en esta botica');
 
     const porCaja = Math.max(lote.producto?.unidades_por_caja ?? 1, 1);
+    if (dto.unidad === UnidadEmpaque.BLISTER && porCaja === 1) {
+      throw new BadRequestException(
+        `"${lote.producto?.nombre}" no tiene blísters: registre la merma en unidades (cajas).`,
+      );
+    }
 
     // 2) Descontar del lote con la MISMA regla de apertura de cajas que usan
     //    las ventas (función compartida en fefo.service.ts).

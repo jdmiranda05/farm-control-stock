@@ -61,6 +61,8 @@ export interface Categoria {
   botica_id: string;
   nombre: string;
   descripcion: string | null;
+  /** Baja lógica (opcional hasta aplicar supabase/migracion-categorias-activa.sql). */
+  activa?: boolean;
   creado_en: string;
 }
 
@@ -164,7 +166,7 @@ export interface MovimientoKardex {
 
 /** Movimiento con datos anidados para la tabla del Kardex. */
 export interface MovimientoDetallado extends MovimientoKardex {
-  producto: Pick<Producto, 'nombre' | 'codigo' | 'activo'> | null;
+  producto: Pick<Producto, 'nombre' | 'codigo' | 'activo' | 'unidades_por_caja'> | null;
   lote: Pick<Lote, 'numero_lote' | 'fecha_vencimiento'> | null;
   proveedor: Pick<Proveedor, 'nombre'> | null;
   usuario: Pick<Usuario, 'nombre_completo'> | null;

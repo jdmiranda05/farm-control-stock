@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { ArrowDownToLine, PackageOpen, TriangleAlert } from 'lucide-react';
 import {
   EstadoSemaforo,
@@ -6,6 +6,9 @@ import {
   diasParaVencer,
   formatearFecha,
   formatearSoles,
+  formatearStock,
+  hoyIso,
+  tieneBlisters,
   type LoteDetallado,
   type ProductoConStock,
   type Proveedor,
@@ -13,15 +16,17 @@ import {
 } from '@botica/comun';
 import { api } from '../lib/api';
 import { EtiquetaEstado } from '../componentes/ui/EtiquetaEstado';
-import { Cargando } from '../componentes/ui/Cargando';
+import { EsqueletoInventario, EsqueletoTabla } from '../componentes/ui/Esqueleto';
 import { Paginacion } from '../componentes/ui/Paginacion';
 
 /** Semáforo de un lote según cuánto le falta para vencer. */
 function estadoDeLote(lote: LoteDetallado): { estado: EstadoSemaforo; texto: string } {
   const dias = diasParaVencer(lote.fecha_vencimiento);
-  if (dias < 0) return { estado: EstadoSemaforo.ROJO, texto: `Vencido hace ${-dias} día(s)` };
-  if (dias <= 30) return { estado: EstadoSemaforo.AMARILLO, texto: `Vence en ${dias} día(s)` };
-  return { estado: EstadoSemaforo.VERDE, texto: `Vence en ${dias} día(s)` };
+  const enDias = (n: number) => `${n} día${n === 1 ? '' : 's'}`; // "1 día" / "3 días"
+  if (dias < 0) return { estado: EstadoSemaforo.ROJO, texto: `Vencido hace ${enDias(-dias)}` };
+  if (dias === 0) return { estado: EstadoSemaforo.AMARILLO, texto: 'Vence hoy' };
+  if (dias <= 30) return { estado: EstadoSemaforo.AMARILLO, texto: `Vence en ${enDias(dias)}` };
+  return { estado: EstadoSemaforo.VERDE, texto: `Vence en ${enDias(dias)}` };
 }
 
 /**
@@ -36,10 +41,14 @@ function estadoDeLote(lote: LoteDetallado): { estado: EstadoSemaforo; texto: str
  * punto de venta aplicando FEFO.
  */
 export function Inventario() {
-  const [productos, setProductos] = useState<ProductoConStock[]>([]);
+  const [productos, setProductos] = useState<ProductoConStock[] | null>(null);
   const [proveedores, setProveedores] = useState<Proveedor[]>([]);
   const [lotes, setLotes] = useState<RespuestaPaginada<LoteDetallado> | null>(null);
   const [pagina, setPagina] = useState(1);
+  const [cargandoLotes, setCargandoLotes] = useState(false);
+  /** TODOS los lotes con mercadería (no solo la página visible), para la merma. */
+  const [lotesConStock, setLotesConStock] = useState<LoteDetallado[]>([]);
+  const formularioMerma = useRef<HTMLFormElement>(null);
   const [soloVencidos, setSoloVencidos] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [mensaje, setMensaje] = useState<string | null>(null);
@@ -72,36 +81,115 @@ export function Inventario() {
         setProductos(listaProductos);
         setProveedores(listaProveedores);
       })
-      .catch((e: Error) => setError(e.message));
+      .catch((e: Error) => {
+        setError(e.message);
+        setProductos((actual) => actual ?? []);
+      });
   }, []);
 
   const cargarLotes = useCallback(() => {
     const parametros = new URLSearchParams({ pagina: String(pagina), porPagina: '10' });
     if (soloVencidos) parametros.set('soloVencidos', 'true');
+    setCargandoLotes(true);
     api
       .get<RespuestaPaginada<LoteDetallado>>(`/inventario/lotes?${parametros}`)
       .then(setLotes)
-      .catch((e: Error) => setError(e.message));
+      .catch((e: Error) => {
+        setError(e.message);
+        setLotes(
+          (actual) =>
+            actual ?? { datos: [], total: 0, pagina: 1, porPagina: 10, totalPaginas: 0 },
+        );
+      })
+      .finally(() => setCargandoLotes(false));
   }, [pagina, soloVencidos]);
 
+  const cargarLotesConStock = useCallback(() => {
+    api
+      .get<RespuestaPaginada<LoteDetallado>>('/inventario/lotes?soloConStock=true&porPagina=100')
+      .then((r) => setLotesConStock(r.datos))
+      .catch(() => setLotesConStock([]));
+  }, []);
+
   useEffect(cargarCatalogos, [cargarCatalogos]);
+  useEffect(cargarLotesConStock, [cargarLotesConStock]);
   useEffect(cargarLotes, [cargarLotes]);
+
+  /** Rellena el formulario de merma con un lote de la tabla y lo enfoca. */
+  function prepararMerma(lote: LoteDetallado) {
+    const porCaja = Math.max(lote.producto?.unidades_por_caja ?? 1, 1);
+    const vencido = diasParaVencer(lote.fecha_vencimiento) < 0;
+    // Se propone retirar TODO el lote: si hay blísters sueltos, la única forma
+    // de cubrirlo completo es expresarlo en blísters (cajas × blísters + sueltos).
+    const unidad =
+      porCaja > 1 && lote.blisters_sueltos > 0 ? UnidadEmpaque.BLISTER : UnidadEmpaque.CAJA;
+    const cantidad =
+      unidad === UnidadEmpaque.BLISTER
+        ? lote.cajas_completas * porCaja + lote.blisters_sueltos
+        : lote.cajas_completas;
+    setMerma({
+      loteId: lote.id,
+      cantidad: String(Math.max(cantidad, 1)),
+      unidad,
+      motivo: vencido ? 'Vencido' : 'Próximo a vencer',
+    });
+    setError(null);
+    formularioMerma.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setTimeout(() => formularioMerma.current?.querySelector<HTMLInputElement>('input')?.focus(), 350);
+  }
+
+  /** Validaciones de la entrada antes de enviarla al servidor. */
+  function validarEntrada(): string | null {
+    if (!entrada.productoId) return 'Seleccione el producto que está recibiendo';
+    if (!entrada.numeroLote.trim()) return 'Ingrese el número de lote';
+    if (!/^[A-Za-z0-9._\-/ ]{2,40}$/.test(entrada.numeroLote.trim())) {
+      return 'El número de lote solo puede tener letras, números y los signos - _ . /';
+    }
+    if (!entrada.fechaVencimiento) return 'Ingrese la fecha de vencimiento';
+    const hoy = hoyIso();
+    if (entrada.fechaVencimiento <= hoy) {
+      return 'No se puede recibir mercadería vencida o que vence hoy: revise la fecha de vencimiento';
+    }
+    const cajas = Number(entrada.cantidadCajas);
+    if (!Number.isInteger(cajas) || cajas < 1) return 'La cantidad debe ser un número entero mayor que 0';
+    if (cajas > 10000) return 'La cantidad recibida es demasiado alta, revise el dato';
+    const costo = Number(entrada.costoCaja);
+    if (entrada.costoCaja === '' || !Number.isFinite(costo) || costo <= 0) {
+      return 'El costo de compra debe ser mayor que 0';
+    }
+    if (productoEntrada && costo > Number(productoEntrada.precio_caja)) {
+      return (
+        `El costo (${formatearSoles(costo)}) es mayor que el precio de venta ` +
+        `(${formatearSoles(productoEntrada.precio_caja)}): se vendería a pérdida`
+      );
+    }
+    return null;
+  }
 
   async function registrarEntrada(evento: FormEvent) {
     evento.preventDefault();
-    setProcesando('entrada');
     setError(null);
     setMensaje(null);
+    const falla = validarEntrada();
+    if (falla) {
+      setError(falla);
+      return;
+    }
+    setProcesando('entrada');
     try {
       await api.post('/inventario/entradas', {
         productoId: entrada.productoId,
         proveedorId: entrada.proveedorId || undefined,
-        numeroLote: entrada.numeroLote,
+        numeroLote: entrada.numeroLote.trim(),
         fechaVencimiento: entrada.fechaVencimiento,
         cantidadCajas: Number(entrada.cantidadCajas),
         costoCaja: Number(entrada.costoCaja),
       });
-      setMensaje(`Entrada registrada: ${entrada.cantidadCajas} caja(s) del lote ${entrada.numeroLote}.`);
+      setMensaje(
+        `Entrada registrada: ${entrada.cantidadCajas} ${
+          productoEntrada && !tieneBlisters(productoEntrada) ? 'unidad(es)' : 'caja(s)'
+        } del lote ${entrada.numeroLote.trim()}.`,
+      );
       setEntrada({
         productoId: '',
         proveedorId: '',
@@ -112,6 +200,7 @@ export function Inventario() {
       });
       cargarCatalogos();
       cargarLotes();
+      cargarLotesConStock();
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -121,9 +210,29 @@ export function Inventario() {
 
   async function registrarMerma(evento: FormEvent) {
     evento.preventDefault();
-    setProcesando('merma');
     setError(null);
     setMensaje(null);
+    if (!loteMerma) {
+      setError('Seleccione el lote afectado');
+      return;
+    }
+    const cantidad = Number(merma.cantidad);
+    if (!Number.isInteger(cantidad) || cantidad < 1) {
+      setError('La cantidad de la merma debe ser un número entero mayor que 0');
+      return;
+    }
+    if (cantidad > maximoMerma) {
+      setError(
+        `El lote ${loteMerma.numero_lote} solo tiene ${maximoMerma} ` +
+          `${merma.unidad === UnidadEmpaque.CAJA ? nombreCajas : 'blíster(es)'} disponibles`,
+      );
+      return;
+    }
+    if (merma.motivo.trim().length < 3) {
+      setError('Describa el motivo de la merma (mínimo 3 caracteres)');
+      return;
+    }
+    setProcesando('merma');
     try {
       const respuesta = await api.post<{ mensaje: string; valorMermaSoles: number }>(
         '/inventario/mermas',
@@ -131,7 +240,7 @@ export function Inventario() {
           loteId: merma.loteId,
           cantidad: Number(merma.cantidad),
           unidad: merma.unidad,
-          motivo: merma.motivo,
+          motivo: merma.motivo.trim(),
         },
       );
       setMensaje(
@@ -140,12 +249,33 @@ export function Inventario() {
       setMerma({ loteId: '', cantidad: '1', unidad: UnidadEmpaque.CAJA, motivo: '' });
       cargarCatalogos();
       cargarLotes();
+      cargarLotesConStock();
     } catch (e) {
       setError((e as Error).message);
     } finally {
       setProcesando(null);
     }
   }
+
+  // ---- Datos derivados de lo seleccionado en los formularios ----
+  const productoEntrada = productos?.find((p) => p.id === entrada.productoId) ?? null;
+  const loteMerma = lotesConStock.find((l) => l.id === merma.loteId) ?? null;
+  const loteMermaConBlisters = loteMerma?.producto
+    ? tieneBlisters({ unidades_por_caja: loteMerma.producto.unidades_por_caja })
+    : true;
+  const nombreCajas = loteMermaConBlisters ? 'caja(s)' : 'unidad(es)';
+  const porCajaMerma = Math.max(loteMerma?.producto?.unidades_por_caja ?? 1, 1);
+  const maximoMerma = loteMerma
+    ? merma.unidad === UnidadEmpaque.CAJA
+      ? loteMerma.cajas_completas
+      : loteMerma.cajas_completas * porCajaMerma + loteMerma.blisters_sueltos
+    : 0;
+  const ahora = new Date(Date.now() + 86_400_000);
+  const manana = new Date(ahora.getTime() - ahora.getTimezoneOffset() * 60_000)
+    .toISOString()
+    .slice(0, 10);
+
+  if (!productos || !lotes) return <EsqueletoInventario />;
 
   return (
     <div className="space-y-6">
@@ -157,14 +287,21 @@ export function Inventario() {
       </div>
 
       {mensaje && (
-        <p className="rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{mensaje}</p>
+        <p role="status" className="aparecer rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+          {mensaje}
+        </p>
       )}
-      {error && <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
+      {error && (
+        <p role="alert" className="aparecer rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error}
+        </p>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* ══════ ENTRADA MANUAL ══════ */}
         <form
           onSubmit={registrarEntrada}
+          noValidate
           className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm"
         >
           <h2 className="mb-1 flex items-center gap-2 font-semibold text-gray-900">
@@ -174,7 +311,8 @@ export function Inventario() {
             Registrar entrada de mercadería
           </h2>
           <p className="mb-4 text-xs text-gray-500">
-            Las entradas se registran siempre en CAJAS, tal como llegan del proveedor.
+            Las entradas se registran siempre en CAJAS (o UNIDADES si el producto no tiene
+            blísters), tal como llegan del proveedor.
           </p>
 
           <div className="grid grid-cols-2 gap-3">
@@ -189,7 +327,11 @@ export function Inventario() {
                 <option value="">Seleccione un producto…</option>
                 {productos.map((producto) => (
                   <option key={producto.id} value={producto.id}>
-                    {producto.nombre} ({producto.unidades_por_caja} blíster/caja)
+                    {producto.nombre} (
+                    {tieneBlisters(producto)
+                      ? `${producto.unidades_por_caja} blísters/caja`
+                      : 'sin blísters, por unidad'}
+                    )
                   </option>
                 ))}
               </select>
@@ -228,6 +370,7 @@ export function Inventario() {
               <input
                 required
                 type="date"
+                min={manana}
                 value={entrada.fechaVencimiento}
                 onChange={(e) => setEntrada({ ...entrada, fechaVencimiento: e.target.value })}
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-emerald-500"
@@ -235,11 +378,13 @@ export function Inventario() {
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-gray-600">
-                Cantidad de cajas *
+                Cantidad de {productoEntrada && !tieneBlisters(productoEntrada) ? 'unidades' : 'cajas'} *
               </label>
               <input
                 required
                 type="number"
+                step="1"
+                max="10000"
                 min="1"
                 value={entrada.cantidadCajas}
                 onChange={(e) => setEntrada({ ...entrada, cantidadCajas: e.target.value })}
@@ -248,13 +393,13 @@ export function Inventario() {
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-gray-600">
-                Costo por caja (S/) *
+                Costo por {productoEntrada && !tieneBlisters(productoEntrada) ? 'unidad' : 'caja'} (S/) *
               </label>
               <input
                 required
                 type="number"
                 step="0.01"
-                min="0"
+                min="0.01"
                 value={entrada.costoCaja}
                 onChange={(e) => setEntrada({ ...entrada, costoCaja: e.target.value })}
                 placeholder="4.20"
@@ -274,7 +419,9 @@ export function Inventario() {
 
         {/* ══════ MERMA ══════ */}
         <form
+          ref={formularioMerma}
           onSubmit={registrarMerma}
+          noValidate
           className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm"
         >
           <h2 className="mb-1 flex items-center gap-2 font-semibold text-gray-900">
@@ -294,13 +441,20 @@ export function Inventario() {
               <select
                 required
                 value={merma.loteId}
-                onChange={(e) => setMerma({ ...merma, loteId: e.target.value })}
+                onChange={(e) => {
+                  const lote = lotesConStock.find((l) => l.id === e.target.value);
+                  const conBlisters = (lote?.producto?.unidades_por_caja ?? 1) > 1;
+                  setMerma({
+                    ...merma,
+                    loteId: e.target.value,
+                    // Sin blísters no existe la unidad "blíster"
+                    unidad: conBlisters ? merma.unidad : UnidadEmpaque.CAJA,
+                  });
+                }}
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-emerald-500"
               >
                 <option value="">Seleccione el lote afectado…</option>
-                {(lotes?.datos ?? [])
-                  .filter((lote) => lote.cajas_completas > 0 || lote.blisters_sueltos > 0)
-                  .map((lote) => (
+                {lotesConStock.map((lote) => (
                     <option key={lote.id} value={lote.id}>
                       {lote.producto?.nombre} — {lote.numero_lote} (vence{' '}
                       {formatearFecha(lote.fecha_vencimiento)})
@@ -308,7 +462,7 @@ export function Inventario() {
                   ))}
               </select>
               <p className="mt-1 text-[11px] text-gray-400">
-                Se listan los lotes de la página actual de la tabla inferior
+                Todos los lotes con mercadería, el más próximo a vencer primero
               </p>
             </div>
 
@@ -318,6 +472,8 @@ export function Inventario() {
                 required
                 type="number"
                 min="1"
+                step="1"
+                max={loteMerma ? maximoMerma : undefined}
                 value={merma.cantidad}
                 onChange={(e) => setMerma({ ...merma, cantidad: e.target.value })}
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-emerald-500"
@@ -332,15 +488,23 @@ export function Inventario() {
                 }
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-emerald-500"
               >
-                <option value={UnidadEmpaque.CAJA}>Cajas</option>
-                <option value={UnidadEmpaque.BLISTER}>Blísters</option>
+                <option value={UnidadEmpaque.CAJA}>
+                  {loteMermaConBlisters ? 'Cajas' : 'Unidades'}
+                </option>
+                {loteMermaConBlisters && (
+                  <option value={UnidadEmpaque.BLISTER}>Blísters</option>
+                )}
               </select>
+              {loteMerma && (
+                <p className="mt-1 text-[11px] text-gray-400">Máximo: {maximoMerma}</p>
+              )}
             </div>
 
             <div className="col-span-2">
               <label className="mb-1 block text-xs font-medium text-gray-600">Motivo *</label>
               <input
                 required
+                maxLength={200}
                 value={merma.motivo}
                 onChange={(e) => setMerma({ ...merma, motivo: e.target.value })}
                 placeholder="Vencido / Frasco roto en almacén"
@@ -392,8 +556,10 @@ export function Inventario() {
           </label>
         </div>
 
-        {!lotes ? (
-          <Cargando mensaje="Cargando lotes…" />
+        {cargandoLotes ? (
+          <div className="p-3">
+            <EsqueletoTabla filas={5} columnas={7} />
+          </div>
         ) : lotes.datos.length === 0 ? (
           <p className="px-5 py-10 text-center text-sm text-gray-500">
             {soloVencidos
@@ -413,6 +579,9 @@ export function Inventario() {
                     <th className="px-5 py-3 text-center">Existencias</th>
                     <th className="px-5 py-3 text-right">Costo/caja</th>
                     <th className="px-5 py-3">Estado</th>
+                    <th className="px-5 py-3 text-right">
+                      <span className="sr-only">Acción</span>
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
@@ -435,7 +604,7 @@ export function Inventario() {
                         </td>
                         <td className="px-5 py-3 text-center">
                           <p className="font-medium text-gray-800">
-                            {lote.cajas_completas} caja(s)
+                            {lote.cajas_completas} {porCaja > 1 ? 'caja(s)' : 'unidad(es)'}
                           </p>
                           {lote.blisters_sueltos > 0 && (
                             <p className="flex items-center justify-center gap-1 text-xs text-blue-600">
@@ -443,7 +612,11 @@ export function Inventario() {
                               {lote.blisters_sueltos} blíster(es) sueltos
                             </p>
                           )}
-                          <p className="text-xs text-gray-400">{totalBlisters} en total</p>
+                          {porCaja > 1 && (
+                            <p className="text-xs text-gray-400">
+                              {formatearStock(totalBlisters, porCaja)}
+                            </p>
+                          )}
                         </td>
                         <td className="px-5 py-3 text-right text-gray-700">
                           {formatearSoles(lote.costo_caja)}
@@ -453,6 +626,18 @@ export function Inventario() {
                             <span className="text-xs text-gray-400">Agotado</span>
                           ) : (
                             <EtiquetaEstado estado={estado} texto={texto} />
+                          )}
+                        </td>
+                        <td className="px-5 py-3 text-right">
+                          {/* Atajo: retirar un lote vencido o por vencer sin buscarlo */}
+                          {totalBlisters > 0 && estado !== EstadoSemaforo.VERDE && (
+                            <button
+                              type="button"
+                              onClick={() => prepararMerma(lote)}
+                              className="whitespace-nowrap rounded-full bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100"
+                            >
+                              Registrar merma
+                            </button>
                           )}
                         </td>
                       </tr>

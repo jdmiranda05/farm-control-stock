@@ -16,7 +16,8 @@ const NOMBRE_ROL: Record<RolUsuario, string> = {
  *
  * Reglas:
  *   - Endpoint sin @Roles(...)  -> basta con estar autenticado.
- *   - Usuario con rol ADMIN     -> accede siempre (tiene control total).
+ *   - El ADMIN NO tiene pase libre: solo hace funciones administrativas,
+ *     por eso cada endpoint declara explícitamente si el ADMIN participa.
  *   - En cualquier otro caso    -> su rol debe estar en la lista permitida.
  */
 @Injectable()
@@ -37,9 +38,6 @@ export class GuardiaRoles implements CanActivate {
 
     // Endpoint público sin usuario (caso borde): no aplica restricción de rol.
     if (!usuario) return true;
-
-    // El ADMIN tiene control total del sistema.
-    if (usuario.rol === RolUsuario.ADMIN) return true;
 
     if (!rolesPermitidos.includes(usuario.rol)) {
       const permitidos = rolesPermitidos.map((rol) => NOMBRE_ROL[rol]).join(' o ');

@@ -124,23 +124,37 @@ pnpm dev          # compila @botica/comun y levanta backend + frontend
 
 ## 👥 Roles y permisos (RBAC)
 
+El `ADMIN` cumple **solo funciones administrativas**: no vende ni opera el
+almacén (el backend ya no le da "pase libre"; cada endpoint declara sus roles).
+
 | Acción | ADMIN | ALMACENERO | VENDEDOR |
 | --- | :---: | :---: | :---: |
-| Punto de venta (POS) | ✅ | — | ✅ |
+| Punto de venta (POS) | — | — | ✅ |
 | Consultar catálogo y stock | ✅ | ✅ | ✅ |
-| Crear / editar productos y categorías | ✅ | ✅ | — |
-| **Eliminar categorías** | ✅ | — | — |
-| Desactivar productos | ✅ | ✅ | — |
+| Registrar productos y categorías nuevos | ✅ | — | — |
+| **Editar / deshabilitar productos** | ✅ | — | — |
+| **Renombrar / eliminar categorías** | ✅ | — | — |
 | **Reactivar productos** (desde el Kardex) | ✅ | — | — |
-| Entradas manuales de mercadería | ✅ | ✅ | — |
-| Registrar mermas | ✅ | ✅ | — |
-| Gestionar proveedores | ✅ | ✅ | — |
-| Ver Kardex y reportes | ✅ | ✅ | — |
+| Entradas manuales de mercadería | — | ✅ | — |
+| Registrar mermas | — | ✅ | — |
+| Registrar / editar / dar de baja proveedores | ✅ | — | — |
+| Consultar proveedores | ✅ | ✅ | — |
+| Dashboard, Kardex y reportes | ✅ | ✅ | — |
 | **Corregir registros del Kardex** | ✅ | — | — |
 | Configuración de la botica | ✅ | — | — |
+| Ver alertas (automáticas) | ✅ | ✅ | ✅ |
 
 El `VENDEDOR` entra directamente al POS: su menú solo muestra Punto de Venta,
 Productos (consulta) y Alertas.
+
+### Productos con y sin blísters
+Al registrar un producto se indica si **viene en blísters**. Si no (frascos,
+jarabes, cremas), se guarda con `unidades_por_caja = 1`, se vende solo por
+unidad y el POS / las mermas no permiten la modalidad "blíster". Las reglas de
+empaque (`validarEmpaque` en `@botica/comun`) las aplican el formulario y el
+backend: precio > 0, al menos 2 blísters por caja, el blíster más barato que la
+caja y la suma de blísters no menor que el precio de la caja. El empaque no se
+puede cambiar mientras el producto tenga mercadería en almacén.
 
 ---
 
@@ -153,26 +167,29 @@ sobre la botica del usuario autenticado.
 | --- | --- | --- | --- |
 | GET | `/api/salud` | Estado de la API (público) | — |
 | GET | `/api/autenticacion/perfil` | Usuario + botica del token | autenticado |
-| GET | `/api/panel/resumen` | KPIs + productos en atención | autenticado |
+| GET | `/api/panel/resumen` | KPIs + productos en atención | ALMACENERO / ADMIN |
 | GET | `/api/productos` | Catálogo con stock y semáforos | autenticado |
 | GET | `/api/productos/inactivos` | Productos dados de baja | autenticado |
-| POST/PATCH | `/api/productos` · `/:id` | Crear / editar producto | ALMACENERO |
+| POST | `/api/productos` | Crear producto | ADMIN |
+| PATCH | `/api/productos/:id` | **Editar producto** | ADMIN |
 | PATCH | `/api/productos/:id/reactivar` | **Reactivar producto** | ADMIN |
-| DELETE | `/api/productos/:id` | Baja lógica | ALMACENERO |
-| GET/POST | `/api/categorias` | Listar / crear | autenticado / ALMACENERO |
-| DELETE | `/api/categorias/:id` | **Eliminar categoría** | ADMIN |
+| DELETE | `/api/productos/:id` | **Baja lógica** | ADMIN |
+| GET/POST | `/api/categorias` | Listar / crear | autenticado / ADMIN |
+| PATCH/DELETE | `/api/categorias/:id` | **Renombrar / eliminar categoría** | ADMIN |
 | GET | `/api/proveedores` | Listar proveedores | autenticado |
-| POST/PATCH | `/api/proveedores` · `/:id` | Crear / editar | ALMACENERO |
+| POST/PATCH | `/api/proveedores` · `/:id` | Crear / editar | ADMIN |
+| DELETE | `/api/proveedores/:id` | Baja lógica | ADMIN |
 | GET | `/api/inventario/lotes` | Lotes paginados (orden FEFO) | autenticado |
 | POST | `/api/inventario/entradas` | Entrada manual (en cajas) | ALMACENERO |
 | POST | `/api/inventario/mermas` | Declarar merma valorizada | ALMACENERO |
 | POST | `/api/ventas` | **Venta con descuento FEFO** | VENDEDOR |
 | GET | `/api/ventas` | Historial de comprobantes | autenticado |
-| GET | `/api/kardex` | Historial paginado con filtros | ALMACENERO |
+| GET | `/api/kardex` | Historial paginado con filtros | ALMACENERO / ADMIN |
 | PATCH | `/api/kardex/:id` | **Corregir un registro** | ADMIN |
-| GET | `/api/reportes/diario` | Entradas y salidas + KPIs | ALMACENERO |
-| GET | `/api/reportes/merma` | Merma económica en soles | ALMACENERO |
-| GET | `/api/alertas` · `/contador` | Alertas y contadores | autenticado |
+| GET | `/api/reportes/diario` | Entradas y salidas + KPIs | ALMACENERO / ADMIN |
+| GET | `/api/reportes/merma` | Merma económica en soles | ALMACENERO / ADMIN |
+| GET | `/api/alertas?recalcular=true` · `/contador` | Recalcula y lista alertas / contadores | autenticado |
+| PATCH | `/api/alertas/vistas` | Marca las activas como vistas | autenticado |
 | POST | `/api/alertas/generar` | Recalcular alertas | autenticado |
 | GET/PATCH | `/api/boticas/mia` | Ver / editar configuración | autenticado / ADMIN |
 
@@ -258,7 +275,10 @@ el historial de ventas.
 `AlertasService.generarAlertas()` calcula el conjunto de alertas que **deberían**
 existir y lo compara con las activas: crea las que faltan, refresca mensajes y
 **resuelve automáticamente** las que ya no aplican. Es idempotente y lo dispara un
-cron horario (`@nestjs/schedule`) o el botón "Recalcular ahora".
+cron horario (`@nestjs/schedule`) y, además, **cada vez que alguien abre la
+pantalla de Alertas** (y cada minuto mientras sigue abierta) o se consulta la
+campanita. Las alertas no se marcan como "leídas" ni se "resuelven" a mano:
+desaparecen solas cuando su causa se corrige.
 
 ---
 

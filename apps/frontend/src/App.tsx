@@ -14,7 +14,13 @@ import { Kardex } from './paginas/Kardex';
 import { ReporteDiario } from './paginas/ReporteDiario';
 import { Alertas } from './paginas/Alertas';
 import { Configuracion } from './paginas/Configuracion';
-import { esAdmin, puedeGestionarInventario, puedeVender, puedeVerReportes } from './lib/permisos';
+import {
+  esAdmin,
+  puedeGestionarInventario,
+  puedeVender,
+  puedeVerProveedores,
+  puedeVerReportes,
+} from './lib/permisos';
 
 /**
  * Pantalla de inicio según el rol:
@@ -53,7 +59,7 @@ export default function App() {
           >
             <Route index element={<PaginaInicial />} />
 
-            {/* Punto de venta: VENDEDOR y ADMIN */}
+            {/* Punto de venta: solo VENDEDOR */}
             <Route
               path="punto-venta"
               element={
@@ -66,7 +72,7 @@ export default function App() {
             {/* Catálogo: lo consultan todos los roles (el vendedor ve stock) */}
             <Route path="productos" element={<Productos />} />
 
-            {/* Almacén: ALMACENERO y ADMIN */}
+            {/* Almacén: solo ALMACENERO */}
             <Route
               path="inventario"
               element={
@@ -75,10 +81,11 @@ export default function App() {
                 </RutaPorRol>
               }
             />
+            {/* Proveedores: ALMACENERO los gestiona; ADMIN consulta y da de baja */}
             <Route
               path="proveedores"
               element={
-                <RutaPorRol permitido={puedeGestionarInventario}>
+                <RutaPorRol permitido={puedeVerProveedores}>
                   <Proveedores />
                 </RutaPorRol>
               }

@@ -10,7 +10,7 @@ import { CorregirMovimientoDto } from './dto/corregir-movimiento.dto';
  * Endpoints del Kardex (historial de existencias).
  *
  * Permisos:
- *   - Consultar el historial -> cualquier rol autenticado
+ *   - Consultar el historial -> ALMACENERO y ADMIN
  *   - CORREGIR un registro   -> solo ADMIN
  */
 @Controller('kardex')
@@ -18,12 +18,14 @@ export class KardexController {
   constructor(private readonly servicio: KardexService) {}
 
   /** GET /api/kardex?tipo=&productoId=&desde=&hasta=&pagina=&porPagina= */
+  @Roles(RolUsuario.ALMACENERO, RolUsuario.ADMIN)
   @Get()
   listar(@UsuarioActual() usuario: PerfilUsuario, @Query() filtros: FiltroKardexDto) {
     return this.servicio.listar(usuario.botica_id, filtros);
   }
 
   /** GET /api/kardex/producto/:id — historial reciente de un producto. */
+  @Roles(RolUsuario.ALMACENERO, RolUsuario.ADMIN)
   @Get('producto/:id')
   porProducto(
     @UsuarioActual() usuario: PerfilUsuario,

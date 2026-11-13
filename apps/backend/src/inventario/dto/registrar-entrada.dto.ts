@@ -47,6 +47,6 @@ export class RegistrarEntradaDto {
     { maxDecimalPlaces: 2 },
     { message: 'El costo por caja admite máximo 2 decimales' },
   )
-  @Min(0, { message: 'El costo por caja no puede ser negativo' })
+  @Min(0.01, { message: 'El costo por caja debe ser mayor que 0' })
   costoCaja: number;
 }

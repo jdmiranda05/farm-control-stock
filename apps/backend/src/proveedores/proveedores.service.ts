@@ -102,4 +102,19 @@ export class ProveedoresService {
     this.supabase.verificarError(error, 'desactivar el proveedor');
     return { mensaje: 'Proveedor desactivado correctamente' };
   }
+
+  /** Reactivar un proveedor dado de baja (solo ADMIN). */
+  async reactivar(boticaId: string, proveedorId: string): Promise<{ mensaje: string }> {
+    const proveedor = await this.obtenerPorId(boticaId, proveedorId);
+    if (proveedor.activo) {
+      throw new BadRequestException(`El proveedor "${proveedor.nombre}" ya está activo`);
+    }
+    const { error } = await this.supabase.cliente
+      .from('proveedores')
+      .update({ activo: true })
+      .eq('botica_id', boticaId)
+      .eq('id', proveedorId);
+    this.supabase.verificarError(error, 'reactivar el proveedor');
+    return { mensaje: `Proveedor "${proveedor.nombre}" reactivado` };
+  }
 }

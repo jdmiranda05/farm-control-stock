@@ -11,7 +11,7 @@
  * el backend, en los decoradores @Roles(...) de cada endpoint.
  */
 export enum RolUsuario {
-  /** Control total: configuración, reactivar productos, corregir el kardex. */
+  /** Solo funciones administrativas: catálogo, configuración, kardex y reportes. */
   ADMIN = 'ADMIN',
   /** Recepción de mercadería: entradas manuales, lotes, proveedores y merma. */
   ALMACENERO = 'ALMACENERO',

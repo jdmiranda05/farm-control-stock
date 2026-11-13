@@ -120,7 +120,7 @@ export class ReportesService {
     const { data: pagina_datos, count } = await this.supabase.cliente
       .from('movimientos_kardex')
       .select(
-        '*, producto:productos(nombre, codigo, activo), lote:lotes(numero_lote, fecha_vencimiento), ' +
+        '*, producto:productos(nombre, codigo, activo, unidades_por_caja), lote:lotes(numero_lote, fecha_vencimiento), ' +
           'proveedor:proveedores(nombre), usuario:usuarios!usuario_id(nombre_completo)',
         { count: 'exact' },
       )

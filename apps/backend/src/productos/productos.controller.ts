@@ -25,8 +25,9 @@ import { ActualizarProductoDto } from './dto/actualizar-producto.dto';
  *
  * Permisos:
  *   - Consultar    -> cualquier rol (el VENDEDOR necesita ver stock en el POS)
- *   - Crear/editar -> ALMACENERO (y ADMIN, que tiene control total)
- *   - Desactivar   -> ALMACENERO
+ *   - Crear        -> solo ADMIN
+ *   - Editar       -> solo ADMIN
+ *   - Desactivar   -> solo ADMIN
  *   - REACTIVAR    -> solo ADMIN
  */
 @Controller('productos')
@@ -49,14 +50,14 @@ export class ProductosController {
   }
 
   /** POST /api/productos — crear producto. */
-  @Roles(RolUsuario.ALMACENERO)
+  @Roles(RolUsuario.ADMIN)
   @Post()
   crear(@UsuarioActual() usuario: PerfilUsuario, @Body() dto: CrearProductoDto) {
     return this.servicio.crear(usuario.botica_id, dto);
   }
 
   /** PATCH /api/productos/:id — actualizar datos del producto. */
-  @Roles(RolUsuario.ALMACENERO)
+  @Roles(RolUsuario.ADMIN)
   @Patch(':id')
   actualizar(
     @UsuarioActual() usuario: PerfilUsuario,
@@ -80,7 +81,7 @@ export class ProductosController {
   }
 
   /** DELETE /api/productos/:id — baja lógica (conserva el historial). */
-  @Roles(RolUsuario.ALMACENERO)
+  @Roles(RolUsuario.ADMIN)
   @Delete(':id')
   desactivar(
     @UsuarioActual() usuario: PerfilUsuario,

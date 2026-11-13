@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import {
   Alerta,
@@ -12,6 +12,7 @@ import {
   diasParaVencer,
   formatearFecha,
   formatearStock,
+  nombreUnidadMinima,
 } from '@botica/comun';
 import { SupabaseService } from '../supabase/supabase.service';
 
@@ -51,27 +52,56 @@ export class AlertasService {
   // GENERACIÓN / RECONCILIACIÓN
   // ============================================================
 
-  async generarAlertas(boticaId: string): Promise<ResumenGeneracionAlertas> {
-    // ---- Datos de entrada ------------------------------------------------
-    const { data: botica } = await this.supabase.cliente
-      .from('boticas')
-      .select('dias_alerta_vencimiento')
-      .eq('id', boticaId)
-      .single();
-    const diasAlerta: number = botica?.dias_alerta_vencimiento ?? 30;
+  /** Recalculos en curso por botica: evita duplicados si llegan dos a la vez. */
+  private readonly enCurso = new Map<string, Promise<ResumenGeneracionAlertas>>();
 
-    const { data: productos, error: errorVista } = await this.supabase.cliente
-      .from('vista_stock_productos')
-      .select('*')
-      .eq('botica_id', boticaId)
-      .eq('activo', true);
+  /**
+   * Punto de entrada del recálculo. Si ya hay uno en marcha para la misma
+   * botica (p. ej. la campanita y la pantalla de alertas a la vez), se
+   * reutiliza en lugar de lanzar otro que podría duplicar alertas.
+   */
+  generarAlertas(boticaId: string): Promise<ResumenGeneracionAlertas> {
+    const existente = this.enCurso.get(boticaId);
+    if (existente) return existente;
+
+    const promesa = this.reconciliar(boticaId).finally(() => this.enCurso.delete(boticaId));
+    this.enCurso.set(boticaId, promesa);
+    return promesa;
+  }
+
+  private async reconciliar(boticaId: string): Promise<ResumenGeneracionAlertas> {
+    // ---- Datos de entrada: las 4 consultas van EN PARALELO ---------------
+    // (antes iban una tras otra y la pantalla de alertas tardaba ~4 s)
+    const [
+      { data: botica },
+      { data: productos, error: errorVista },
+      { data: lotes, error: errorLotes },
+      { data: activas, error: errorActivas },
+    ] = await Promise.all([
+      this.supabase.cliente
+        .from('boticas')
+        .select('dias_alerta_vencimiento')
+        .eq('id', boticaId)
+        .single(),
+      this.supabase.cliente
+        .from('vista_stock_productos')
+        .select('*')
+        .eq('botica_id', boticaId)
+        .eq('activo', true),
+      this.supabase.cliente
+        .from('lotes')
+        .select('*, producto:productos(id, nombre, activo, unidades_por_caja)')
+        .eq('botica_id', boticaId),
+      this.supabase.cliente
+        .from('alertas')
+        .select('*')
+        .eq('botica_id', boticaId)
+        .eq('estado', EstadoAlerta.ACTIVA),
+    ]);
     this.supabase.verificarError(errorVista, 'consultar el stock consolidado');
-
-    const { data: lotes, error: errorLotes } = await this.supabase.cliente
-      .from('lotes')
-      .select('*, producto:productos(id, nombre, activo, unidades_por_caja)')
-      .eq('botica_id', boticaId);
     this.supabase.verificarError(errorLotes, 'consultar los lotes');
+    this.supabase.verificarError(errorActivas, 'consultar las alertas activas');
+    const diasAlerta: number = botica?.dias_alerta_vencimiento ?? 30;
 
     // ---- (a) Conjunto de alertas deseadas --------------------------------
     const deseadas = new Map<string, AlertaDeseada>();
@@ -88,9 +118,9 @@ export class AlertasService {
           ? `Sin stock: "${p.nombre}" no tiene existencias disponibles.`
           : p.estado_stock === EstadoSemaforo.ROJO
             ? `Stock crítico: "${p.nombre}" tiene ${stockLegible}, por debajo de la ` +
-              `mitad de su mínimo (${p.stock_minimo} blísters).`
+              `mitad de su mínimo (${p.stock_minimo} ${nombreUnidadMinima(p)}).`
             : `Stock bajo: "${p.nombre}" tiene ${stockLegible} y su mínimo es ` +
-              `${p.stock_minimo} blísters.`;
+              `${p.stock_minimo} ${nombreUnidadMinima(p)}.`;
 
       deseadas.set(clave(TipoAlerta.STOCK_MINIMO, p.id, null), {
         tipo: TipoAlerta.STOCK_MINIMO,
@@ -135,18 +165,13 @@ export class AlertasService {
       }
     }
 
-    // ---- (b) Alertas activas actualmente guardadas -----------------------
-    const { data: activas, error: errorActivas } = await this.supabase.cliente
-      .from('alertas')
-      .select('*')
-      .eq('botica_id', boticaId)
-      .eq('estado', EstadoAlerta.ACTIVA);
-    this.supabase.verificarError(errorActivas, 'consultar las alertas activas');
+    // ---- (b) Las alertas activas guardadas ya se leyeron arriba -----------
 
     // ---- (c) Reconciliación -----------------------------------------------
     let creadas = 0;
     let actualizadas = 0;
     const idsParaResolver: string[] = [];
+    const refrescos: PromiseLike<unknown>[] = [];
     const clavesYaExistentes = new Set<string>();
 
     for (const alerta of (activas ?? []) as Alerta[]) {
@@ -160,21 +185,26 @@ export class AlertasService {
         clavesYaExistentes.add(claveAlerta);
         if (deseada.mensaje !== alerta.mensaje) {
           // Cambió el detalle (ej. ahora quedan menos días) -> refrescar
-          await this.supabase.cliente
-            .from('alertas')
-            .update({ mensaje: deseada.mensaje })
-            .eq('id', alerta.id);
+          refrescos.push(
+            this.supabase.cliente
+              .from('alertas')
+              .update({ mensaje: deseada.mensaje })
+              .eq('id', alerta.id),
+          );
           actualizadas++;
         }
       }
     }
 
     if (idsParaResolver.length > 0) {
-      await this.supabase.cliente
-        .from('alertas')
-        .update({ estado: EstadoAlerta.RESUELTA, resuelto_en: new Date().toISOString() })
-        .in('id', idsParaResolver);
+      refrescos.push(
+        this.supabase.cliente
+          .from('alertas')
+          .update({ estado: EstadoAlerta.RESUELTA, resuelto_en: new Date().toISOString() })
+          .in('id', idsParaResolver),
+      );
     }
+    await Promise.all(refrescos);
 
     const nuevas = [...deseadas.entries()]
       .filter(([claveDeseada]) => !clavesYaExistentes.has(claveDeseada))
@@ -198,7 +228,8 @@ export class AlertasService {
 
   /**
    * Tarea programada: recalcula las alertas de TODAS las boticas activas
-   * cada hora. Los usuarios también pueden forzarlo con POST /api/alertas/generar.
+   * cada hora. Además se recalculan cada vez que alguien abre la pantalla de alertas
+   * (GET /api/alertas?recalcular=true).
    */
   @Cron(CronExpression.EVERY_HOUR)
   async generarAlertasTodasLasBoticas(): Promise<void> {
@@ -261,35 +292,16 @@ export class AlertasService {
     return { activas: activas ?? 0, noLeidas: noLeidas ?? 0 };
   }
 
-  /** Marca una alerta como leída (no la resuelve: la condición sigue). */
-  async marcarLeida(boticaId: string, alertaId: string): Promise<Alerta> {
+  /** Marca como vistas todas las alertas activas de la botica. */
+  async marcarTodasLeidas(boticaId: string): Promise<{ actualizadas: number }> {
     const { data, error } = await this.supabase.cliente
       .from('alertas')
       .update({ leida: true })
       .eq('botica_id', boticaId)
-      .eq('id', alertaId)
-      .select()
-      .maybeSingle();
-    this.supabase.verificarError(error, 'marcar la alerta como leída');
-    if (!data) throw new NotFoundException('Alerta no encontrada en esta botica');
-    return data as Alerta;
-  }
-
-  /** Resuelve una alerta manualmente. */
-  async resolver(boticaId: string, alertaId: string): Promise<Alerta> {
-    const { data, error } = await this.supabase.cliente
-      .from('alertas')
-      .update({
-        estado: EstadoAlerta.RESUELTA,
-        leida: true,
-        resuelto_en: new Date().toISOString(),
-      })
-      .eq('botica_id', boticaId)
-      .eq('id', alertaId)
-      .select()
-      .maybeSingle();
-    this.supabase.verificarError(error, 'resolver la alerta');
-    if (!data) throw new NotFoundException('Alerta no encontrada en esta botica');
-    return data as Alerta;
+      .eq('estado', EstadoAlerta.ACTIVA)
+      .eq('leida', false)
+      .select('id');
+    this.supabase.verificarError(error, 'marcar las alertas como vistas');
+    return { actualizadas: data?.length ?? 0 };
   }
 }

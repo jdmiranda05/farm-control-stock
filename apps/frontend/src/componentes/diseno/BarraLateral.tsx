@@ -1,11 +1,11 @@
+import { Fragment } from 'react';
 import { NavLink } from 'react-router-dom';
 import {
   BellRing,
   Boxes,
   ChevronsLeft,
-  ChevronsRight,
   ClipboardList,
-  Cross,
+  FileBarChart,
   LayoutDashboard,
   Pill,
   Settings,
@@ -19,6 +19,7 @@ import {
   esAdmin,
   puedeGestionarInventario,
   puedeVender,
+  puedeVerProveedores,
   puedeVerReportes,
 } from '../../lib/permisos';
 
@@ -36,144 +37,99 @@ interface EnlaceMenu {
   visible: (perfil: PerfilUsuario | null) => boolean;
 }
 
+interface SeccionMenu {
+  titulo: string;
+  enlaces: EnlaceMenu[];
+}
+
 /** Siempre visible para cualquier usuario autenticado. */
 const paraTodos = () => true;
 
 /**
- * Accesos del menú. Cada uno declara quién puede verlo, de modo que la
- * navegación se adapta al rol: el vendedor ve una interfaz simple centrada
- * en la caja, mientras que el administrador ve el sistema completo.
+ * Accesos del menú, agrupados en secciones como una barra lateral de Apple
+ * (máximo dos niveles). Cada acceso declara qué roles lo ven:
+ *   - VENDEDOR   -> caja, catálogo (consulta) y alertas.
+ *   - ALMACENERO -> almacén, proveedores, kardex, reportes y alertas.
+ *   - ADMIN      -> solo funciones administrativas y de supervisión.
  */
-const ENLACES: EnlaceMenu[] = [
+const SECCIONES: SeccionMenu[] = [
   {
-    ruta: '/',
-    etiqueta: 'Dashboard',
-    Icono: LayoutDashboard,
-    exacto: true,
-    visible: puedeVerReportes,
+    titulo: 'General',
+    enlaces: [
+      // La pantalla principal de cada rol va primero: Dashboard o Punto de Venta
+      { ruta: '/', etiqueta: 'Dashboard', Icono: LayoutDashboard, exacto: true, visible: puedeVerReportes },
+      { ruta: '/punto-venta', etiqueta: 'Punto de Venta', Icono: ShoppingCart, exacto: false, visible: puedeVender },
+      { ruta: '/alertas', etiqueta: 'Alertas', Icono: BellRing, exacto: false, visible: paraTodos },
+    ],
   },
   {
-    ruta: '/punto-venta',
-    etiqueta: 'Punto de Venta',
-    Icono: ShoppingCart,
-    exacto: false,
-    visible: puedeVender,
+    titulo: 'Operación',
+    enlaces: [
+      { ruta: '/productos', etiqueta: 'Productos y Categorías', Icono: Pill, exacto: false, visible: paraTodos },
+      { ruta: '/inventario', etiqueta: 'Lotes e Inventario', Icono: Boxes, exacto: false, visible: puedeGestionarInventario },
+      { ruta: '/proveedores', etiqueta: 'Proveedores', Icono: Truck, exacto: false, visible: puedeVerProveedores },
+    ],
   },
   {
-    ruta: '/productos',
-    etiqueta: 'Productos y Categorías',
-    Icono: Pill,
-    exacto: false,
-    visible: paraTodos,
-  },
-  {
-    ruta: '/inventario',
-    etiqueta: 'Lotes e Inventario',
-    Icono: Boxes,
-    exacto: false,
-    visible: puedeGestionarInventario,
-  },
-  {
-    ruta: '/proveedores',
-    etiqueta: 'Proveedores',
-    Icono: Truck,
-    exacto: false,
-    visible: puedeGestionarInventario,
-  },
-  {
-    ruta: '/kardex',
-    etiqueta: 'Kardex',
-    Icono: ClipboardList,
-    exacto: false,
-    visible: puedeVerReportes,
-  },
-  {
-    ruta: '/reportes',
-    etiqueta: 'Reporte Diario',
-    Icono: ClipboardList,
-    exacto: false,
-    visible: puedeVerReportes,
-  },
-  {
-    ruta: '/alertas',
-    etiqueta: 'Alertas',
-    Icono: BellRing,
-    exacto: false,
-    visible: paraTodos,
-  },
-  {
-    ruta: '/configuracion',
-    etiqueta: 'Configuración',
-    Icono: Settings,
-    exacto: false,
-    visible: esAdmin,
+    titulo: 'Control',
+    enlaces: [
+      { ruta: '/kardex', etiqueta: 'Kardex', Icono: ClipboardList, exacto: false, visible: puedeVerReportes },
+      { ruta: '/reportes', etiqueta: 'Reporte Diario', Icono: FileBarChart, exacto: false, visible: puedeVerReportes },
+      { ruta: '/configuracion', etiqueta: 'Configuración', Icono: Settings, exacto: false, visible: esAdmin },
+    ],
   },
 ];
 
 /**
- * Sidebar FIJA a la izquierda, colapsable.
- * Colapsada muestra solo los íconos (w-20); expandida, ícono + texto (w-64).
+ * Sidebar FIJA a la izquierda, desplegable.
+ * Plegada muestra solo los íconos (w-20); desplegada, ícono + texto (w-64).
+ * Los textos y los títulos de sección se desvanecen al ritmo del ancho.
  */
 export function BarraLateral({ colapsada, alternar }: Props) {
   const { perfil } = useAutenticacion();
-  const enlacesVisibles = ENLACES.filter((enlace) => enlace.visible(perfil));
+  const secciones = SECCIONES.map((s) => ({
+    ...s,
+    enlaces: s.enlaces.filter((e) => e.visible(perfil)),
+  })).filter((s) => s.enlaces.length > 0);
 
   return (
     <aside
-      className={`menu-lateral fixed z-40 flex flex-col ${
-        colapsada ? 'w-20' : 'w-64'
-      }`}
+      className={`menu-lateral fixed z-40 flex flex-col ${colapsada ? 'w-20' : 'w-64'}`}
+      aria-label="Menú principal"
     >
-      {/* Logotipo del sistema */}
-      <div className="marca-lateral flex h-16 items-center gap-3 px-5">
-        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-emerald-500 text-white">
-          <Cross className="h-5 w-5" />
-        </span>
-        {!colapsada && (
-          <div className="leading-tight">
-            <p className="text-sm font-bold tracking-wide">Botica SaaS</p>
-            <p className="text-[11px] text-slate-400">Inventario y Ventas</p>
-          </div>
-        )}
-      </div>
-
-      {/* Navegación principal */}
-      <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
-        {enlacesVisibles.map(({ ruta, etiqueta, Icono, exacto }) => (
-          <NavLink
-            key={ruta}
-            to={ruta}
-            end={exacto}
-            aria-label={etiqueta}
-            title={etiqueta}
-            className={({ isActive }) =>
-              `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
-                isActive
-                  ? 'bg-emerald-600 text-white'
-                  : 'text-gray-500 hover:bg-gray-100 hover:text-emerald-700'
-              } ${colapsada ? 'justify-center' : ''}`
-            }
-          >
-            <Icono className="h-5 w-5 shrink-0" />
-            {!colapsada && <span className="truncate">{etiqueta}</span>}
-          </NavLink>
+      <nav className="flex-1 overflow-y-auto overflow-x-hidden">
+        {secciones.map((seccion) => (
+          <Fragment key={seccion.titulo}>
+            <span className="titulo-seccion-menu" aria-hidden={colapsada}>
+              {seccion.titulo}
+            </span>
+            {seccion.enlaces.map(({ ruta, etiqueta, Icono, exacto }) => (
+              <NavLink
+                key={ruta}
+                to={ruta}
+                end={exacto}
+                aria-label={etiqueta}
+                title={colapsada ? etiqueta : undefined}
+                className="flex items-center gap-3 px-3 py-2"
+              >
+                <Icono className="h-[19px] w-[19px] shrink-0" strokeWidth={2} />
+                <span className="texto-menu">{etiqueta}</span>
+              </NavLink>
+            ))}
+          </Fragment>
         ))}
       </nav>
 
-      {/* Botón colapsar / expandir */}
+      {/* Botón plegar / desplegar */}
       <button
         onClick={alternar}
         aria-label={colapsada ? 'Expandir menú' : 'Colapsar menú'}
-        className="alternar-menu flex items-center justify-center gap-2 py-3 text-sm text-gray-500 hover:bg-gray-100 hover:text-emerald-700"
+        aria-expanded={!colapsada}
+        title={colapsada ? 'Expandir menú' : 'Colapsar menú'}
+        className="alternar-menu flex items-center justify-center gap-2 py-2.5 hover:bg-black/5"
       >
-        {colapsada ? (
-          <ChevronsRight className="h-5 w-5" />
-        ) : (
-          <>
-            <ChevronsLeft className="h-5 w-5" />
-            <span>Colapsar menú</span>
-          </>
-        )}
+        <ChevronsLeft className="icono-alternar h-[18px] w-[18px] shrink-0" />
+        <span className="texto-menu">Colapsar menú</span>
       </button>
     </aside>
   );
