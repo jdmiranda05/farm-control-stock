@@ -17,6 +17,7 @@ import { VentasModule } from './ventas/ventas.module';
 import { ReportesModule } from './reportes/reportes.module';
 import { AlertasModule } from './alertas/alertas.module';
 import { PanelModule } from './panel/panel.module';
+import { UsuariosModule } from './usuarios/usuarios.module';
 
 /**
  * Módulo raíz: ensambla la aplicación completa.
@@ -43,6 +44,7 @@ import { PanelModule } from './panel/panel.module';
     ReportesModule,
     AlertasModule,
     PanelModule,
+    UsuariosModule,
   ],
   controllers: [AppController],
   providers: [

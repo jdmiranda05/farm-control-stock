@@ -14,6 +14,7 @@ import { Kardex } from './paginas/Kardex';
 import { ReporteDiario } from './paginas/ReporteDiario';
 import { Alertas } from './paginas/Alertas';
 import { Configuracion } from './paginas/Configuracion';
+import { Usuarios } from './paginas/Usuarios';
 import {
   esAdmin,
   puedeGestionarInventario,
@@ -110,6 +111,16 @@ export default function App() {
             />
 
             <Route path="alertas" element={<Alertas />} />
+
+            {/* Usuarios: el ADMIN crea almaceneros y vendedores */}
+            <Route
+              path="usuarios"
+              element={
+                <RutaPorRol permitido={esAdmin}>
+                  <Usuarios />
+                </RutaPorRol>
+              }
+            />
 
             {/* Configuración: solo ADMIN */}
             <Route

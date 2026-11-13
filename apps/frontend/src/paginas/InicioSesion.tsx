@@ -267,7 +267,7 @@ export function InicioSesion() {
         </form>
 
         <p className="mt-6 text-center text-xs text-gray-400">
-          Proyecto Universitario · Sistema Boticas · 2026
+          Sistema de Inventario para Boticas
         </p>
       </div>
     </div>

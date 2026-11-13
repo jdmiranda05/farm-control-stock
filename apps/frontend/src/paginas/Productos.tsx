@@ -27,6 +27,7 @@ import {
   type ProductoConStock,
 } from '@botica/comun';
 import { api } from '../lib/api';
+import { Selector } from '../componentes/ui/Selector';
 import { EtiquetaEstado } from '../componentes/ui/EtiquetaEstado';
 import { EsqueletoProductos } from '../componentes/ui/Esqueleto';
 import { useConfirmacion } from '../componentes/ui/DialogoConfirmacion';
@@ -853,23 +854,23 @@ export function Productos() {
                 <label htmlFor="producto-categoria" className="mb-1 block text-xs font-medium text-gray-600">
                   Categoría
                 </label>
-                <select
+                <Selector
                   id="producto-categoria"
-                  value={f.categoriaId}
-                  onChange={(e) => setFormulario({ ...f, categoriaId: e.target.value })}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-emerald-500"
-                >
-                  <option value="">Sin categoría</option>
-                  {/* Solo categorías activas, más la actual si fue deshabilitada */}
-                  {categorias
-                    .filter((c) => c.activa !== false || c.id === f.categoriaId)
-                    .map((categoria) => (
-                      <option key={categoria.id} value={categoria.id}>
-                        {categoria.nombre}
-                        {categoria.activa === false ? ' (deshabilitada)' : ''}
-                      </option>
-                    ))}
-                </select>
+                  valor={f.categoriaId}
+                  alCambiar={(valor) => setFormulario({ ...f, categoriaId: valor })}
+                  etiquetaAccesible="Categoría"
+                  opciones={[
+                    { valor: '', etiqueta: 'Sin categoría' },
+                    // Solo categorías activas, más la actual si fue deshabilitada
+                    ...categorias
+                      .filter((c) => c.activa !== false || c.id === f.categoriaId)
+                      .map((c) => ({
+                        valor: c.id,
+                        etiqueta: c.nombre,
+                        detalle: c.activa === false ? 'Deshabilitada' : undefined,
+                      })),
+                  ]}
+                />
               </div>
 
               <div>

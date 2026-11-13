@@ -279,6 +279,101 @@ table, .tabular, .text-3xl, .text-2xl { font-variant-numeric: tabular-nums; }
 .boton-peligro:active:not(:disabled), .boton-gris:active:not(:disabled) { transform: scale(.97); }
 .boton-primario:disabled, .boton-oscuro:disabled, .boton-peligro:disabled, .boton-gris:disabled { opacity: .5; }
 
+/* ════════════════ Selector desplegable (pop-up button) ════════════════
+   Reemplaza al <select> nativo, cuya lista no se puede estilizar. */
+.selector-boton {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  padding: 8px 10px 8px 14px;
+  border: 1px solid transparent;
+  border-radius: var(--radio-control);
+  background: var(--relleno-control);
+  color: var(--texto);
+  font-size: 15px;
+  font-weight: 500;
+  text-align: left;
+  transition: background-color 180ms var(--ease-apple), border-color 180ms var(--ease-apple), box-shadow 180ms var(--ease-apple);
+}
+.selector-boton:hover:not(:disabled) { background: rgba(118, 118, 128, .14); }
+.selector-boton:focus-visible,
+.selector-boton.abierto {
+  outline: none;
+  background: white;
+  border-color: var(--acento);
+  box-shadow: 0 0 0 4px rgba(9, 132, 81, .14);
+}
+.selector-boton:disabled { opacity: .55; cursor: not-allowed; }
+.selector-chevron { color: #8e8e93; transition: transform 240ms var(--ease-apple), color 180ms ease; }
+.selector-boton.abierto .selector-chevron { color: var(--acento); transform: scaleY(.85); }
+.sistema-theme button.selector-boton:active:not(:disabled) { transform: none; }
+.selector-boton.campo-invalido { border-color: #ff453a; background: #fff5f4; }
+
+.selector-capa {
+  overflow: hidden;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, .92);
+  -webkit-backdrop-filter: saturate(180%) blur(24px);
+  backdrop-filter: saturate(180%) blur(24px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, .14), 0 2px 6px rgba(0, 0, 0, .06), 0 0 0 .5px rgba(0, 0, 0, .1);
+  font-family: var(--font-sans);
+  letter-spacing: -.011em;
+  transform-origin: top center;
+  animation: abrir-selector 220ms var(--ease-apple) both;
+}
+.selector-capa.hacia-arriba { transform-origin: bottom center; }
+.selector-capa.cerrando { animation: cerrar-selector 120ms ease-in forwards; }
+@keyframes abrir-selector { from { opacity: 0; transform: scale(.96) translateY(-4px); } to { opacity: 1; transform: none; } }
+@keyframes cerrar-selector { to { opacity: 0; transform: scale(.98); } }
+.selector-capa.hacia-arriba { animation-name: abrir-selector-arriba; }
+.selector-capa.hacia-arriba.cerrando { animation-name: cerrar-selector; }
+@keyframes abrir-selector-arriba { from { opacity: 0; transform: scale(.96) translateY(4px); } to { opacity: 1; transform: none; } }
+
+.selector-buscador {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 6px 2px;
+  padding: 0 10px;
+  height: 36px;
+  border-radius: 9px;
+  background: rgba(118, 118, 128, .1);
+}
+.selector-buscador input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 14px;
+  color: var(--texto);
+}
+.selector-lista { margin: 0; padding: 6px; list-style: none; overflow-y: auto; outline: none; overscroll-behavior: contain; }
+.selector-opcion {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 7px 10px 7px 8px;
+  border-radius: 9px;
+  font-size: 14px;
+  color: var(--texto);
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 90ms ease, color 90ms ease;
+}
+.selector-opcion > svg { color: var(--acento); }
+.selector-opcion[aria-selected='true'] { font-weight: 600; }
+.selector-opcion.activa { background: var(--acento); color: white; }
+.selector-opcion.activa > svg { color: white; }
+.selector-opcion.activa .selector-detalle { color: rgba(255, 255, 255, .82); }
+.selector-opcion.deshabilitada { opacity: .4; cursor: not-allowed; }
+.selector-opcion.deshabilitada.activa { background: rgba(118, 118, 128, .12); color: var(--texto); }
+.selector-detalle { display: block; font-size: 12px; font-weight: 400; color: var(--texto-2); }
+.selector-vacio { padding: 14px; text-align: center; font-size: 13px; color: var(--texto-2); }
+
 /* Control segmentado (estilo UISegmentedControl) con indicador que se desliza */
 .segmentado {
   position: relative;

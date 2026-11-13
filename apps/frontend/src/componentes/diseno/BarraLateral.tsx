@@ -11,6 +11,7 @@ import {
   Settings,
   ShoppingCart,
   Truck,
+  UsersRound,
   type LucideIcon,
 } from 'lucide-react';
 import type { PerfilUsuario } from '@botica/comun';
@@ -75,6 +76,7 @@ const SECCIONES: SeccionMenu[] = [
     enlaces: [
       { ruta: '/kardex', etiqueta: 'Kardex', Icono: ClipboardList, exacto: false, visible: puedeVerReportes },
       { ruta: '/reportes', etiqueta: 'Reporte Diario', Icono: FileBarChart, exacto: false, visible: puedeVerReportes },
+      { ruta: '/usuarios', etiqueta: 'Usuarios', Icono: UsersRound, exacto: false, visible: esAdmin },
       { ruta: '/configuracion', etiqueta: 'Configuración', Icono: Settings, exacto: false, visible: esAdmin },
     ],
   },

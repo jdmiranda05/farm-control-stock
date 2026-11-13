@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { CalendarClock, CircleCheck, OctagonAlert, RefreshCw, TrendingDown } from 'lucide-react';
 import { EstadoAlerta, TipoAlerta, type AlertaDetallada } from '@botica/comun';
 import { api } from '../lib/api';
+import { Selector } from '../componentes/ui/Selector';
 import { EsqueletoAlertas, EsqueletoLista } from '../componentes/ui/Esqueleto';
 
 /** Apariencia de cada tipo de alerta en el listado. */
@@ -133,27 +134,29 @@ export function Alertas() {
 
       {/* Filtros */}
       <div className="flex flex-wrap items-center gap-3">
-        <select
-          value={filtroEstado}
-          onChange={(e) => setFiltroEstado(e.target.value)}
-          aria-label="Filtrar por estado"
-          className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500"
-        >
-          <option value="">Todos los estados</option>
-          <option value={EstadoAlerta.ACTIVA}>Activas</option>
-          <option value={EstadoAlerta.RESUELTA}>Resueltas (historial)</option>
-        </select>
-        <select
-          value={filtroTipo}
-          onChange={(e) => setFiltroTipo(e.target.value)}
-          aria-label="Filtrar por tipo"
-          className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500"
-        >
-          <option value="">Todos los tipos</option>
-          <option value={TipoAlerta.STOCK_MINIMO}>Stock mínimo</option>
-          <option value={TipoAlerta.VENCIMIENTO_PROXIMO}>Vencimiento próximo</option>
-          <option value={TipoAlerta.VENCIDO}>Vencido</option>
-        </select>
+        <Selector
+          className="w-56"
+          valor={filtroEstado}
+          alCambiar={setFiltroEstado}
+          etiquetaAccesible="Filtrar por estado"
+          opciones={[
+            { valor: '', etiqueta: 'Todos los estados' },
+            { valor: EstadoAlerta.ACTIVA, etiqueta: 'Activas' },
+            { valor: EstadoAlerta.RESUELTA, etiqueta: 'Resueltas (historial)' },
+          ]}
+        />
+        <Selector
+          className="w-56"
+          valor={filtroTipo}
+          alCambiar={setFiltroTipo}
+          etiquetaAccesible="Filtrar por tipo"
+          opciones={[
+            { valor: '', etiqueta: 'Todos los tipos' },
+            { valor: TipoAlerta.STOCK_MINIMO, etiqueta: 'Stock mínimo' },
+            { valor: TipoAlerta.VENCIMIENTO_PROXIMO, etiqueta: 'Vencimiento próximo' },
+            { valor: TipoAlerta.VENCIDO, etiqueta: 'Vencido' },
+          ]}
+        />
         {alertas && filtroEstado !== EstadoAlerta.RESUELTA && (
           <span className="text-sm text-gray-500">
             {activas} alerta{activas === 1 ? '' : 's'} activa{activas === 1 ? '' : 's'}

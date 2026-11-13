@@ -15,6 +15,7 @@ import {
   type RespuestaPaginada,
 } from '@botica/comun';
 import { api } from '../lib/api';
+import { Selector } from '../componentes/ui/Selector';
 import { EtiquetaEstado } from '../componentes/ui/EtiquetaEstado';
 import { EsqueletoInventario, EsqueletoTabla } from '../componentes/ui/Esqueleto';
 import { Paginacion } from '../componentes/ui/Paginacion';
@@ -318,39 +319,37 @@ export function Inventario() {
           <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2">
               <label className="mb-1 block text-xs font-medium text-gray-600">Producto *</label>
-              <select
-                required
-                value={entrada.productoId}
-                onChange={(e) => setEntrada({ ...entrada, productoId: e.target.value })}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-emerald-500"
-              >
-                <option value="">Seleccione un producto…</option>
-                {productos.map((producto) => (
-                  <option key={producto.id} value={producto.id}>
-                    {producto.nombre} (
-                    {tieneBlisters(producto)
-                      ? `${producto.unidades_por_caja} blísters/caja`
-                      : 'sin blísters, por unidad'}
-                    )
-                  </option>
-                ))}
-              </select>
+              <Selector
+                valor={entrada.productoId}
+                alCambiar={(valor) => setEntrada({ ...entrada, productoId: valor })}
+                etiquetaAccesible="Producto"
+                marcador="Seleccione un producto…"
+                buscable
+                opciones={productos.map((producto) => ({
+                  valor: producto.id,
+                  etiqueta: producto.nombre,
+                  detalle: tieneBlisters(producto)
+                    ? `${producto.unidades_por_caja} blísters por caja`
+                    : 'Sin blísters · se recibe por unidad',
+                }))}
+              />
             </div>
 
             <div className="col-span-2">
               <label className="mb-1 block text-xs font-medium text-gray-600">Proveedor</label>
-              <select
-                value={entrada.proveedorId}
-                onChange={(e) => setEntrada({ ...entrada, proveedorId: e.target.value })}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-emerald-500"
-              >
-                <option value="">Sin especificar</option>
-                {proveedores.map((proveedor) => (
-                  <option key={proveedor.id} value={proveedor.id}>
-                    {proveedor.nombre}
-                  </option>
-                ))}
-              </select>
+              <Selector
+                valor={entrada.proveedorId}
+                alCambiar={(valor) => setEntrada({ ...entrada, proveedorId: valor })}
+                etiquetaAccesible="Proveedor"
+                opciones={[
+                  { valor: '', etiqueta: 'Sin especificar' },
+                  ...proveedores.map((p) => ({
+                    valor: p.id,
+                    etiqueta: p.nombre,
+                    detalle: p.ruc ? `RUC ${p.ruc}` : undefined,
+                  })),
+                ]}
+              />
             </div>
 
             <div>
@@ -438,29 +437,38 @@ export function Inventario() {
           <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2">
               <label className="mb-1 block text-xs font-medium text-gray-600">Lote *</label>
-              <select
-                required
-                value={merma.loteId}
-                onChange={(e) => {
-                  const lote = lotesConStock.find((l) => l.id === e.target.value);
+              <Selector
+                valor={merma.loteId}
+                alCambiar={(valor) => {
+                  const lote = lotesConStock.find((l) => l.id === valor);
                   const conBlisters = (lote?.producto?.unidades_por_caja ?? 1) > 1;
                   setMerma({
                     ...merma,
-                    loteId: e.target.value,
+                    loteId: valor,
                     // Sin blísters no existe la unidad "blíster"
                     unidad: conBlisters ? merma.unidad : UnidadEmpaque.CAJA,
                   });
                 }}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-emerald-500"
-              >
-                <option value="">Seleccione el lote afectado…</option>
-                {lotesConStock.map((lote) => (
-                    <option key={lote.id} value={lote.id}>
-                      {lote.producto?.nombre} — {lote.numero_lote} (vence{' '}
-                      {formatearFecha(lote.fecha_vencimiento)})
-                    </option>
-                  ))}
-              </select>
+                etiquetaAccesible="Lote afectado"
+                marcador="Seleccione el lote afectado…"
+                buscable
+                opciones={lotesConStock.map((lote) => {
+                  const dias = diasParaVencer(lote.fecha_vencimiento);
+                  return {
+                    valor: lote.id,
+                    etiqueta: `${lote.producto?.nombre ?? 'Producto'} — ${lote.numero_lote}`,
+                    detalle:
+                      (dias < 0 ? 'Vencido el ' : 'Vence el ') +
+                      formatearFecha(lote.fecha_vencimiento) +
+                      ' · ' +
+                      formatearStock(
+                        lote.cajas_completas * Math.max(lote.producto?.unidades_por_caja ?? 1, 1) +
+                          lote.blisters_sueltos,
+                        lote.producto?.unidades_por_caja ?? 1,
+                      ),
+                  };
+                })}
+              />
               <p className="mt-1 text-[11px] text-gray-400">
                 Todos los lotes con mercadería, el más próximo a vencer primero
               </p>
@@ -481,20 +489,17 @@ export function Inventario() {
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-gray-600">Unidad *</label>
-              <select
-                value={merma.unidad}
-                onChange={(e) =>
-                  setMerma({ ...merma, unidad: e.target.value as UnidadEmpaque })
-                }
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-emerald-500"
-              >
-                <option value={UnidadEmpaque.CAJA}>
-                  {loteMermaConBlisters ? 'Cajas' : 'Unidades'}
-                </option>
-                {loteMermaConBlisters && (
-                  <option value={UnidadEmpaque.BLISTER}>Blísters</option>
-                )}
-              </select>
+              <Selector
+                valor={merma.unidad}
+                alCambiar={(valor) => setMerma({ ...merma, unidad: valor as UnidadEmpaque })}
+                etiquetaAccesible="Unidad de la merma"
+                opciones={[
+                  { valor: UnidadEmpaque.CAJA, etiqueta: loteMermaConBlisters ? 'Cajas' : 'Unidades' },
+                  ...(loteMermaConBlisters
+                    ? [{ valor: UnidadEmpaque.BLISTER, etiqueta: 'Blísters' }]
+                    : []),
+                ]}
+              />
               {loteMerma && (
                 <p className="mt-1 text-[11px] text-gray-400">Máximo: {maximoMerma}</p>
               )}

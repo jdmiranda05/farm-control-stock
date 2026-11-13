@@ -10,6 +10,21 @@ import { SupabaseService } from '../../supabase/supabase.service';
 import { CLAVE_ES_PUBLICO } from '../decoradores/publico.decorator';
 
 /**
+ * Caché breve token -> perfil validado (compartida por todo el backend).
+ * Un cambio de rol o una desactivación hecha por el ADMIN la limpia al
+ * instante con olvidarSesionesDe(); si no, caduca sola a los 30 s.
+ */
+const TTL_CACHE_MS = 30_000;
+const cacheSesiones = new Map<string, { perfil: PerfilUsuario; expira: number }>();
+
+/** Descarta las sesiones en caché de un usuario (tras editarlo o desactivarlo). */
+export function olvidarSesionesDe(usuarioId: string): void {
+  for (const [token, valor] of cacheSesiones) {
+    if (valor.perfil.id === usuarioId) cacheSesiones.delete(token);
+  }
+}
+
+/**
  * Guardia global de autenticación (se ejecuta en TODAS las peticiones).
  *
  * Flujo:
@@ -46,7 +61,7 @@ export class GuardiaAutenticacion implements CanActivate {
 
     // Caché breve: una misma pantalla dispara varias peticiones seguidas con
     // el mismo token; validarlo cada vez contra Supabase sumaba ~1 s a cada una.
-    const enCache = this.cache.get(token);
+    const enCache = cacheSesiones.get(token);
     if (enCache && enCache.expira > Date.now()) {
       peticion.usuario = enCache.perfil;
       return true;
@@ -81,19 +96,12 @@ export class GuardiaAutenticacion implements CanActivate {
     return true;
   }
 
-  /**
-   * Token -> perfil validado durante TTL_CACHE_MS. Un cambio de rol o una
-   * desactivación tarda como máximo ese tiempo en aplicarse.
-   */
-  private readonly cache = new Map<string, { perfil: PerfilUsuario; expira: number }>();
-  private static readonly TTL_CACHE_MS = 30_000;
-
   private guardarEnCache(token: string, perfil: PerfilUsuario) {
     const ahora = Date.now();
     // Limpieza simple para que el mapa no crezca sin límite
-    if (this.cache.size > 500) {
-      for (const [clave, valor] of this.cache) if (valor.expira <= ahora) this.cache.delete(clave);
+    if (cacheSesiones.size > 500) {
+      for (const [clave, valor] of cacheSesiones) if (valor.expira <= ahora) cacheSesiones.delete(clave);
     }
-    this.cache.set(token, { perfil, expira: ahora + GuardiaAutenticacion.TTL_CACHE_MS });
+    cacheSesiones.set(token, { perfil, expira: ahora + TTL_CACHE_MS });
   }
 }

@@ -295,6 +295,16 @@ export function EsqueletoReporte() {
   );
 }
 
+export function EsqueletoUsuarios() {
+  return (
+    <Contenedor etiqueta="Cargando usuarios…">
+      <EsqueletoEncabezado conBoton />
+      <Esqueleto className="h-10 w-80 max-w-full rounded-xl" />
+      <EsqueletoTabla filas={5} columnas={4} />
+    </Contenedor>
+  );
+}
+
 export function EsqueletoConfiguracion() {
   return (
     <Contenedor etiqueta="Cargando configuración…">

@@ -11,6 +11,7 @@ import {
   type RespuestaPaginada,
 } from '@botica/comun';
 import { api } from '../lib/api';
+import { Selector } from '../componentes/ui/Selector';
 import { EsqueletoKardex, EsqueletoTabla } from '../componentes/ui/Esqueleto';
 import { Paginacion } from '../componentes/ui/Paginacion';
 import { useAutenticacion } from '../contexto/ContextoAutenticacion';
@@ -208,20 +209,22 @@ export function Kardex() {
       <div className="flex flex-wrap items-end gap-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
         <div>
           <label className="mb-1 block text-xs font-medium text-gray-600">Tipo</label>
-          <select
-            value={filtroTipo}
-            onChange={(e) => {
-              setFiltroTipo(e.target.value);
+          <Selector
+            className="w-60"
+            valor={filtroTipo}
+            alCambiar={(valor) => {
+              setFiltroTipo(valor);
               setPagina(1);
             }}
-            className="rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-emerald-500"
-          >
-            <option value="">Todos</option>
-            <option value={TipoMovimientoKardex.ENTRADA_MANUAL}>Entradas manuales</option>
-            <option value={TipoMovimientoKardex.SALIDA_VENTA}>Salidas por venta</option>
-            <option value={TipoMovimientoKardex.SALIDA_MERMA}>Salidas por merma</option>
-            <option value={TipoMovimientoKardex.AJUSTE_ADMIN}>Ajustes administrativos</option>
-          </select>
+            etiquetaAccesible="Tipo de movimiento"
+            opciones={[
+              { valor: '', etiqueta: 'Todos' },
+              { valor: TipoMovimientoKardex.ENTRADA_MANUAL, etiqueta: 'Entradas manuales' },
+              { valor: TipoMovimientoKardex.SALIDA_VENTA, etiqueta: 'Salidas por venta' },
+              { valor: TipoMovimientoKardex.SALIDA_MERMA, etiqueta: 'Salidas por merma' },
+              { valor: TipoMovimientoKardex.AJUSTE_ADMIN, etiqueta: 'Ajustes administrativos' },
+            ]}
+          />
         </div>
         <div>
           <label className="mb-1 block text-xs font-medium text-gray-600">Desde</label>
