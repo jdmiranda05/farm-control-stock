@@ -8,6 +8,7 @@ import {
   EstadoSemaforo,
   ProductoConStock,
   ResumenGeneracionAlertas,
+  RespuestaPaginada,
   TipoAlerta,
   diasParaVencer,
   formatearFecha,
@@ -15,6 +16,8 @@ import {
   nombreUnidadMinima,
 } from '@botica/comun';
 import { SupabaseService } from '../supabase/supabase.service';
+import { armarRespuestaPaginada, calcularRango } from '../comun/dto/paginacion.dto';
+import { MAXIMO_ALERTAS_POR_PAGINA } from './dto/filtro-alertas.dto';
 
 /** Alerta que "debería existir" según el estado actual del inventario. */
 interface AlertaDeseada {
@@ -255,23 +258,43 @@ export class AlertasService {
   // CONSULTA Y GESTIÓN
   // ============================================================
 
+  /**
+   * Listado PAGINADO en el servidor (máximo 30 por página): la base de datos
+   * devuelve solo la página pedida y el total, aunque haya miles de alertas
+   * históricas resueltas.
+   */
   async listar(
     boticaId: string,
-    filtros: { estado?: EstadoAlerta; tipo?: TipoAlerta },
-  ): Promise<AlertaDetallada[]> {
+    filtros: { estado?: EstadoAlerta; tipo?: TipoAlerta; pagina?: number; porPagina?: number },
+  ): Promise<RespuestaPaginada<AlertaDetallada>> {
+    const { pagina, porPagina, desde, hasta } = calcularRango({
+      pagina: filtros.pagina,
+      porPagina: Math.min(filtros.porPagina ?? MAXIMO_ALERTAS_POR_PAGINA, MAXIMO_ALERTAS_POR_PAGINA),
+    });
+
     let consulta = this.supabase.cliente
       .from('alertas')
-      .select('*, producto:productos(nombre), lote:lotes(numero_lote, fecha_vencimiento)')
-      .eq('botica_id', boticaId)
-      .order('creado_en', { ascending: false })
-      .limit(200);
+      .select('*, producto:productos(nombre), lote:lotes(numero_lote, fecha_vencimiento)', {
+        count: 'exact',
+      })
+      .eq('botica_id', boticaId);
 
     if (filtros.estado) consulta = consulta.eq('estado', filtros.estado);
     if (filtros.tipo) consulta = consulta.eq('tipo', filtros.tipo);
 
-    const { data, error } = await consulta;
+    // Orden estable (fecha + id) para que ninguna alerta se repita ni se
+    // salte entre páginas cuando varias comparten la misma fecha.
+    const { data, error, count } = await consulta
+      .order('creado_en', { ascending: false })
+      .order('id', { ascending: true })
+      .range(desde, hasta);
     this.supabase.verificarError(error, 'listar las alertas');
-    return (data ?? []) as unknown as AlertaDetallada[];
+    return armarRespuestaPaginada(
+      (data ?? []) as unknown as AlertaDetallada[],
+      count ?? 0,
+      pagina,
+      porPagina,
+    );
   }
 
   /** Contadores para la campanita de notificaciones del encabezado. */

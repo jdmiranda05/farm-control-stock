@@ -1,7 +1,8 @@
 import { Controller, Get, Patch, Post, Query } from '@nestjs/common';
-import { EstadoAlerta, PerfilUsuario, TipoAlerta } from '@botica/comun';
+import { PerfilUsuario } from '@botica/comun';
 import { UsuarioActual } from '../autenticacion/decoradores/usuario-actual.decorator';
 import { AlertasService } from './alertas.service';
+import { FiltroAlertasDto } from './dto/filtro-alertas.dto';
 
 /**
  * Endpoints de alertas.
@@ -16,21 +17,19 @@ export class AlertasController {
   constructor(private readonly servicio: AlertasService) {}
 
   /**
-   * GET /api/alertas?estado=ACTIVA&tipo=VENCIDO&recalcular=true
-   * Con `recalcular=true` primero reconcilia el motor de alertas con el
-   * inventario actual, de modo que la pantalla siempre muestra datos al día.
+   * GET /api/alertas?estado=ACTIVA&tipo=VENCIDO&recalcular=true&pagina=1&porPagina=30
+   * Devuelve una página (máximo 30 alertas) y el total. Con `recalcular=true`
+   * primero reconcilia el motor de alertas con el inventario actual, de modo
+   * que la pantalla siempre muestra datos al día.
    */
   @Get()
-  async listar(
-    @UsuarioActual() usuario: PerfilUsuario,
-    @Query('estado') estado?: EstadoAlerta,
-    @Query('tipo') tipo?: TipoAlerta,
-    @Query('recalcular') recalcular?: string,
-  ) {
-    if (recalcular === 'true') await this.servicio.generarAlertas(usuario.botica_id!);
+  async listar(@UsuarioActual() usuario: PerfilUsuario, @Query() filtros: FiltroAlertasDto) {
+    if (filtros.recalcular === 'true') await this.servicio.generarAlertas(usuario.botica_id!);
     return this.servicio.listar(usuario.botica_id!, {
-      estado: estado || undefined,
-      tipo: tipo || undefined,
+      estado: filtros.estado || undefined,
+      tipo: filtros.tipo || undefined,
+      pagina: filtros.pagina,
+      porPagina: filtros.porPagina,
     });
   }
 

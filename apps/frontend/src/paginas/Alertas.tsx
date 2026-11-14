@@ -1,8 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { CalendarClock, CircleCheck, OctagonAlert, RefreshCw, TrendingDown } from 'lucide-react';
-import { EstadoAlerta, TipoAlerta, type AlertaDetallada } from '@botica/comun';
+import {
+  EstadoAlerta,
+  TipoAlerta,
+  type AlertaDetallada,
+  type RespuestaPaginada,
+} from '@botica/comun';
 import { api } from '../lib/api';
 import { Selector } from '../componentes/ui/Selector';
+import { Paginacion } from '../componentes/ui/Paginacion';
 import { EsqueletoAlertas, EsqueletoLista } from '../componentes/ui/Esqueleto';
 
 /** Apariencia de cada tipo de alerta en el listado. */
@@ -27,6 +33,9 @@ const ESTILO_TIPO = {
 /** Las alertas en pantalla se refrescan solas cada minuto. */
 const INTERVALO_REFRESCO_MS = 60_000;
 
+/** Máximo de alertas por página (el backend tampoco acepta más). */
+const ALERTAS_POR_PAGINA = 30;
+
 /**
  * Página "Alertas": centro de notificaciones del sistema.
  *
@@ -37,9 +46,13 @@ const INTERVALO_REFRESCO_MS = 60_000;
  * registra la merma. Por eso no hay botones para "resolver" a mano.
  */
 export function Alertas() {
-  const [alertas, setAlertas] = useState<AlertaDetallada[] | null>(null);
+  const [resultado, setResultado] = useState<RespuestaPaginada<AlertaDetallada> | null>(null);
+  const [pagina, setPagina] = useState(1);
+  const [cargandoPagina, setCargandoPagina] = useState(false);
   const [filtroEstado, setFiltroEstado] = useState<string>(EstadoAlerta.ACTIVA);
   const [filtroTipo, setFiltroTipo] = useState<string>('');
+  const inicioLista = useRef<HTMLDivElement>(null);
+  const alertas = resultado?.datos ?? null;
   const [actualizando, setActualizando] = useState(false);
   const [actualizadoEn, setActualizadoEn] = useState<Date | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -49,39 +62,57 @@ export function Alertas() {
     let cancelado = false;
 
     const consulta = (recalcular: boolean) => {
-      const parametros = new URLSearchParams();
+      const parametros = new URLSearchParams({
+        pagina: String(pagina),
+        porPagina: String(ALERTAS_POR_PAGINA),
+      });
       if (recalcular) parametros.set('recalcular', 'true');
       if (filtroEstado) parametros.set('estado', filtroEstado);
       if (filtroTipo) parametros.set('tipo', filtroTipo);
-      return api.get<AlertaDetallada[]>(`/alertas?${parametros.toString()}`);
+      return api.get<RespuestaPaginada<AlertaDetallada>>(`/alertas?${parametros.toString()}`);
     };
 
     async function cargar() {
       setActualizando(true);
+      let llegoRecalculada = false;
 
       // 1) Lo guardado aparece al instante (sin esperar el recálculo)…
       const recalculada = consulta(true);
       consulta(false)
         .then((rapida) => {
-          if (!cancelado) setAlertas((actual) => actual ?? rapida);
+          if (cancelado || llegoRecalculada) return;
+          setResultado(rapida);
+          setCargandoPagina(false);
         })
         .catch(() => undefined);
 
       // 2) …y se reemplaza por la lista recalculada en cuanto llega.
       try {
-        const lista = await recalculada;
+        const respuesta = await recalculada;
+        llegoRecalculada = true;
         if (cancelado) return;
-        setAlertas(lista);
+
+        // Si al recalcular se resolvieron alertas y esta página quedó vacía,
+        // se pasa a la última página que sí tiene contenido.
+        if (respuesta.datos.length === 0 && pagina > 1 && respuesta.total > 0) {
+          setPagina(respuesta.totalPaginas);
+          return;
+        }
+        setResultado(respuesta);
+        setCargandoPagina(false);
         setActualizadoEn(new Date());
         setError(null);
 
         // Al verlas, las alertas activas dejan de ser "nuevas"
-        if (lista.some((a) => a.estado === EstadoAlerta.ACTIVA && !a.leida)) {
+        if (respuesta.datos.some((a) => a.estado === EstadoAlerta.ACTIVA && !a.leida)) {
           await api.patch('/alertas/vistas').catch(() => undefined);
         }
         window.dispatchEvent(new Event('alertas-actualizadas'));
       } catch (e) {
-        if (!cancelado) setError((e as Error).message);
+        if (!cancelado) {
+          setError((e as Error).message);
+          setCargandoPagina(false);
+        }
       } finally {
         if (!cancelado) setActualizando(false);
         primeraCarga.current = false;
@@ -94,12 +125,30 @@ export function Alertas() {
       cancelado = true;
       clearInterval(intervalo);
     };
-  }, [filtroEstado, filtroTipo]);
+  }, [filtroEstado, filtroTipo, pagina]);
+
+  /** Cambiar filtros o página: esqueleto solo en la lista y volver arriba. */
+  function irAPagina(nueva: number) {
+    setCargandoPagina(true);
+    setPagina(nueva);
+    inicioLista.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+  function cambiarFiltro(aplicar: () => void) {
+    setCargandoPagina(true);
+    aplicar();
+    setPagina(1);
+  }
 
   // Primera visita: esqueleto de toda la pantalla
-  if (!alertas && !error) return <EsqueletoAlertas />;
+  if (!resultado && !error) return <EsqueletoAlertas />;
 
-  const activas = alertas?.filter((a) => a.estado === EstadoAlerta.ACTIVA).length ?? 0;
+  const total = resultado?.total ?? 0;
+  const textoTotal =
+    filtroEstado === EstadoAlerta.ACTIVA
+      ? `${total} alerta${total === 1 ? '' : 's'} activa${total === 1 ? '' : 's'}`
+      : filtroEstado === EstadoAlerta.RESUELTA
+        ? `${total} alerta${total === 1 ? '' : 's'} resuelta${total === 1 ? '' : 's'}`
+        : `${total} alerta${total === 1 ? '' : 's'} en total`;
 
   return (
     <div className="space-y-6">
@@ -133,11 +182,11 @@ export function Alertas() {
       {error && <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
 
       {/* Filtros */}
-      <div className="flex flex-wrap items-center gap-3">
+      <div ref={inicioLista} className="flex scroll-mt-4 flex-wrap items-center gap-3">
         <Selector
           className="w-56"
           valor={filtroEstado}
-          alCambiar={setFiltroEstado}
+          alCambiar={(valor) => cambiarFiltro(() => setFiltroEstado(valor))}
           etiquetaAccesible="Filtrar por estado"
           opciones={[
             { valor: '', etiqueta: 'Todos los estados' },
@@ -148,7 +197,7 @@ export function Alertas() {
         <Selector
           className="w-56"
           valor={filtroTipo}
-          alCambiar={setFiltroTipo}
+          alCambiar={(valor) => cambiarFiltro(() => setFiltroTipo(valor))}
           etiquetaAccesible="Filtrar por tipo"
           opciones={[
             { valor: '', etiqueta: 'Todos los tipos' },
@@ -157,16 +206,12 @@ export function Alertas() {
             { valor: TipoAlerta.VENCIDO, etiqueta: 'Vencido' },
           ]}
         />
-        {alertas && filtroEstado !== EstadoAlerta.RESUELTA && (
-          <span className="text-sm text-gray-500">
-            {activas} alerta{activas === 1 ? '' : 's'} activa{activas === 1 ? '' : 's'}
-          </span>
-        )}
+        {resultado && <span className="text-sm text-gray-500">{textoTotal}</span>}
       </div>
 
       {/* Listado de alertas */}
-      {!alertas ? (
-        <EsqueletoLista />
+      {!alertas || cargandoPagina ? (
+        <EsqueletoLista elementos={6} />
       ) : alertas.length === 0 ? (
         <div className="aparecer rounded-xl border border-gray-200 bg-white p-10 text-center shadow-sm">
           <CircleCheck className="mx-auto h-10 w-10 text-emerald-500" />
@@ -175,7 +220,11 @@ export function Alertas() {
           </p>
         </div>
       ) : (
-        <ul className={`space-y-3 ${primeraCarga.current ? 'lista-animada' : ''}`}>
+        <>
+        <ul
+          key={`${pagina}-${filtroEstado}-${filtroTipo}`}
+          className="lista-animada space-y-3"
+        >
           {alertas.map((alerta) => {
             const estilo = ESTILO_TIPO[alerta.tipo];
             const activa = alerta.estado === EstadoAlerta.ACTIVA;
@@ -227,6 +276,20 @@ export function Alertas() {
             );
           })}
         </ul>
+
+        {/* Paginación: máximo 30 alertas por página */}
+        {resultado && resultado.totalPaginas > 1 && (
+          <div className="overflow-hidden rounded-xl bg-white shadow-sm">
+            <Paginacion
+              pagina={resultado.pagina}
+              totalPaginas={resultado.totalPaginas}
+              total={resultado.total}
+              porPagina={resultado.porPagina}
+              onCambiar={irAPagina}
+            />
+          </div>
+        )}
+        </>
       )}
     </div>
   );

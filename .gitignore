@@ -10,7 +10,7 @@ build/
 .env
 .env.local
 .env.*.local
-
+.claude
 # Sistema operativo / editores
 .DS_Store
 Thumbs.db
