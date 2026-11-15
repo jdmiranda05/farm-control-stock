@@ -644,14 +644,14 @@ export function Productos() {
       {/* ══════ Tabla del catálogo ══════ */}
       <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 px-5 py-3">
-          <div className="flex min-w-[240px] flex-1 items-center gap-2">
+          <div className="flex min-w-0 flex-1 basis-60 items-center gap-2">
             <Search className="h-4 w-4 shrink-0 text-gray-400" />
             <input
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
               placeholder="Buscar por nombre, código, categoría o laboratorio…"
               aria-label="Buscar productos"
-              className="w-full max-w-md rounded-lg border border-gray-300 px-3 py-1.5 text-sm outline-none focus:border-emerald-500"
+              className="w-full min-w-0 max-w-md rounded-lg border border-gray-300 px-3 py-1.5 text-sm outline-none focus:border-emerald-500"
             />
           </div>
           <span className="text-xs text-gray-500">

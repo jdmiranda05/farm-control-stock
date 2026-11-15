@@ -9,30 +9,24 @@ import { Encabezado } from './Encabezado';
  *  ┌────────────┬──────────────────────────────┐
  *  │            │  Encabezado sin scroll      │
  *  │  Sidebar   ├──────────────────────────────┤
- *  │  fija a    │                              │
- *  │  la izq.   │   Contenido de la página     │
+ *  │  a la      │                              │
+ *  │  izquierda │   Contenido de la página     │
  *  │ (colapsa)  │   (<Outlet /> del router)    │
  *  │            │                              │
  *  └────────────┴──────────────────────────────┘
  *
- * La sidebar es `fixed`; el contenido compensa su ancho con margin-left,
- * que cambia junto con el estado colapsada/expandida.
+ * El menú y el contenido ocupan columnas de la misma cuadrícula.
  */
 export function DisposicionPrincipal() {
   const [colapsada, setColapsada] = useState(true);
   const { pathname } = useLocation();
 
   return (
-    <div className="sistema-theme disposicion-principal">
+    <div className={`sistema-theme disposicion-principal ${colapsada ? '' : 'menu-amplio'}`}>
       <Encabezado />
       <BarraLateral colapsada={colapsada} alternar={() => setColapsada((v) => !v)} />
 
-      {/* El margen izquierdo sigue el ancho de la sidebar (w-64 ↔ w-20) */}
-      <div
-        className={`contenido-sistema flex flex-col ${
-          colapsada ? 'menu-compacto' : 'menu-amplio'
-        }`}
-      >
+      <div className="contenido-sistema flex flex-col">
         <main className="contenido-pagina flex-1">
           {/* La clave por ruta reinicia la animación de entrada en cada página */}
           <div key={pathname} className="transicion-pagina">

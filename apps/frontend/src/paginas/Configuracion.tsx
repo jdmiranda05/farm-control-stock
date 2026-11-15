@@ -68,7 +68,7 @@ export function Configuracion() {
   if (!botica) return <EsqueletoConfiguracion />;
 
   return (
-    <div className="max-w-2xl space-y-6">
+    <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Configuración de la Botica</h1>
         <p className="text-sm text-gray-500">Datos generales y parámetros del sistema de alertas</p>

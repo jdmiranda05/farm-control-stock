@@ -83,8 +83,8 @@ const SECCIONES: SeccionMenu[] = [
 ];
 
 /**
- * Sidebar FIJA a la izquierda, desplegable.
- * Plegada muestra solo los íconos (w-20); desplegada, ícono + texto (w-64).
+ * Barra lateral desplegable.
+ * Plegada muestra solo los íconos y desplegada muestra también las etiquetas.
  * Los textos y los títulos de sección se desvanecen al ritmo del ancho.
  */
 export function BarraLateral({ colapsada, alternar }: Props) {
@@ -96,7 +96,7 @@ export function BarraLateral({ colapsada, alternar }: Props) {
 
   return (
     <aside
-      className={`menu-lateral fixed z-40 flex flex-col ${colapsada ? 'w-20' : 'w-64'}`}
+      className={`menu-lateral z-40 flex flex-col ${colapsada ? 'menu-colapsado' : ''}`}
       aria-label="Menú principal"
     >
       <nav className="flex-1 overflow-y-auto overflow-x-hidden">
