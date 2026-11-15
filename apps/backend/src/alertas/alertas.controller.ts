@@ -17,8 +17,8 @@ export class AlertasController {
   constructor(private readonly servicio: AlertasService) {}
 
   /**
-   * GET /api/alertas?estado=ACTIVA&tipo=VENCIDO&recalcular=true&pagina=1&porPagina=30
-   * Devuelve una página (máximo 30 alertas) y el total. Con `recalcular=true`
+   * GET /api/alertas?estado=ACTIVA&tipo=VENCIDO&recalcular=true&pagina=1&porPagina=15
+   * Devuelve una página (máximo 15 alertas) y el total. Con `recalcular=true`
    * primero reconcilia el motor de alertas con el inventario actual, de modo
    * que la pantalla siempre muestra datos al día.
    */

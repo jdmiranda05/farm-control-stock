@@ -259,7 +259,7 @@ export class AlertasService {
   // ============================================================
 
   /**
-   * Listado PAGINADO en el servidor (máximo 30 por página): la base de datos
+   * Listado PAGINADO en el servidor (máximo 15 por página): la base de datos
    * devuelve solo la página pedida y el total, aunque haya miles de alertas
    * históricas resueltas.
    */
