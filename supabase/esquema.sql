@@ -1,5 +1,5 @@
 -- ============================================================================
---  SISTEMA SAAS MULTI-TENANT DE GESTIÓN PARA BOTICAS  —  ESQUEMA v2
+--  SISTEMA MULTI-TENANT DE GESTIÓN PARA BOTICAS  —  ESQUEMA v2
 --  Inventario · Kardex · Ventas (POS) · Reportes · Merma
 --  Base de datos: Supabase (PostgreSQL 15+)
 --
@@ -50,7 +50,7 @@ create type estado_alerta as enum ('ACTIVA', 'RESUELTA');
 
 
 -- ============================================================
--- 2) `boticas` — el inquilino (tenant) del SaaS
+-- 2) `boticas` — el inquilino (tenant) del sistema
 -- ============================================================
 create table boticas (
   id                       uuid primary key default gen_random_uuid(),
@@ -66,7 +66,7 @@ create table boticas (
   actualizado_en           timestamptz not null default now()
 );
 
-comment on table boticas is 'Organizaciones (tenants) del SaaS. Cada botica es independiente.';
+comment on table boticas is 'Organizaciones (tenants) del sistema. Cada botica es independiente.';
 
 
 -- ============================================================

@@ -1,6 +1,6 @@
-# 💊 Botica SaaS — Inventario, Kardex, Ventas y Reportes
+# 💊 Botica — Inventario, Kardex, Ventas y Reportes
 
-Sistema web **SaaS multi-tenant** para la gestión integral de boticas y farmacias:
+Sistema web **multi-tenant** para la gestión integral de boticas y farmacias:
 control de inventario por lotes, kardex, punto de venta con despacho automático,
 alertas de vencimiento y reportes de merma económica. **Proyecto Universitario.**
 
@@ -16,7 +16,7 @@ alertas de vencimiento y reportes de merma económica. **Proyecto Universitario.
 ## 🗂️ Estructura del monorepo
 
 ```
-saas-boticas/
+farm-control-stock/
 ├── package.json                  # Scripts raíz (dev, build)
 ├── pnpm-workspace.yaml           # Declara apps/* y packages/*
 ├── supabase/

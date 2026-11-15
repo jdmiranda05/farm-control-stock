@@ -9,7 +9,7 @@ export class AppController {
   salud() {
     return {
       estado: 'en línea',
-      servicio: 'API SaaS Boticas',
+      servicio: 'API Boticas',
       fecha: new Date().toISOString(),
     };
   }

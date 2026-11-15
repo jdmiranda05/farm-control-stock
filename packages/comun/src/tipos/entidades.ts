@@ -13,7 +13,7 @@ import {
  * PostgreSQL, para que el mapeo entre capas sea evidente en la sustentación.
  */
 
-/** Tabla `boticas` — cada fila es un inquilino (tenant) del SaaS. */
+/** Tabla `boticas` — cada fila es un inquilino (tenant) del sistema. */
 export interface Botica {
   id: string;
   nombre: string;

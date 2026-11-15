@@ -6,7 +6,7 @@ export const CLAVE_ROLES = 'rolesPermitidos';
 
 /**
  * Restringe un endpoint a ciertos roles.
- * El rol ADMIN_SISTEMA siempre tiene acceso (superadministrador del SaaS).
+ * El rol ADMIN_SISTEMA siempre tiene acceso (superadministrador del sistema).
  *
  * Ejemplo:
  *   @Roles(RolUsuario.ADMIN_BOTICA)

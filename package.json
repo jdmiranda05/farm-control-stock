@@ -1,8 +1,8 @@
 {
-  "name": "saas-boticas",
+  "name": "farm-control-stock",
   "version": "1.0.0",
   "private": true,
-  "description": "Sistema SaaS multi-tenant de control de inventario y alertas para boticas/farmacias — Proyecto Universitario",
+  "description": "Sistema multi-tenant de control de inventario y alertas para boticas/farmacias — Proyecto Universitario",
   "scripts": {
     "build:comun": "pnpm --filter @botica/comun build",
     "dev": "pnpm build:comun && pnpm --parallel -r dev",

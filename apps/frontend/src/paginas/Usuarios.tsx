@@ -259,7 +259,7 @@ export function Usuarios() {
   async function copiarCredenciales() {
     if (!credenciales) return;
     const texto =
-      `Acceso a Botica SaaS\nUsuario: ${credenciales.correo}\n` +
+      `Acceso a Botica\nUsuario: ${credenciales.correo}\n` +
       `Contraseña temporal: ${credenciales.contrasena}\n${window.location.origin}`;
     try {
       await navigator.clipboard.writeText(texto);
