@@ -68,6 +68,7 @@ export interface Categoria {
 
 /** Tabla `productos` — catálogo (el stock real vive en `lotes`). */
 export interface Producto {
+  imagen_url?: string | null;
   id: string;
   botica_id: string;
   categoria_id: string | null;
@@ -203,6 +204,7 @@ export interface ContadorAlertas {
  * de sus lotes + los dos semáforos calculados en SQL.
  */
 export interface ProductoConStock {
+  imagen_url?: string | null;
   id: string;
   botica_id: string;
   codigo: string | null;

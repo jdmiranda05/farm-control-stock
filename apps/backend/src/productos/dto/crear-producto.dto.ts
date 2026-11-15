@@ -6,6 +6,7 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  IsUrl,
   MaxLength,
   Max,
   Min,
@@ -39,6 +40,14 @@ export class CrearProductoDto {
   @IsOptional()
   @IsString()
   laboratorio?: string;
+
+  @IsOptional()
+  @MaxLength(2048, { message: 'El enlace de la imagen no puede superar 2048 caracteres' })
+  @IsUrl(
+    { protocols: ['https'], require_protocol: true, disallow_auth: true },
+    { message: 'Ingresa un enlace HTTPS válido para la imagen' },
+  )
+  imagenUrl?: string | null;
 
   /**
    * ¿El producto viene en blísters que se pueden vender por separado?

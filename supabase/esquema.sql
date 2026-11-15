@@ -132,6 +132,7 @@ create table productos (
   nombre           text not null,
   presentacion     text,
   laboratorio      text,
+  imagen_url       text,
   requiere_receta  boolean not null default false,
 
   -- ---- Empaque y precios (requisito: venta por caja y por blíster) ----
@@ -379,7 +380,8 @@ select
     when (s.proxima_fecha_vencimiento - current_date) <= b.dias_alerta_vencimiento
       then 'AMARILLO'
     else 'VERDE'
-  end as estado_vencimiento
+  end as estado_vencimiento,
+  p.imagen_url
 from productos p
 join boticas b            on b.id = p.botica_id
 join stock_por_producto s on s.producto_id = p.id
