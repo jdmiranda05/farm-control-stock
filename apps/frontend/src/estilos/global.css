@@ -94,15 +94,21 @@ table, .tabular, .text-3xl, .text-2xl { font-variant-numeric: tabular-nums; }
   font-family: var(--font-sans);
 }
 .disposicion-principal {
-  display: flex;
-  flex-direction: column;
+  --ancho-menu: 80px;
+  display: grid;
+  grid-template-columns: var(--ancho-menu) minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  column-gap: 16px;
   height: calc(100dvh - 32px);
   min-height: 0;
   overflow: hidden;
+  transition: grid-template-columns 320ms var(--ease-apple);
 }
+.disposicion-principal.menu-amplio { --ancho-menu: 256px; }
 
 /* Barra superior flotante con material translúcido (capa funcional, no contenido) */
 .encabezado-sistema {
+  grid-column: 1 / -1;
   position: relative;
   flex-shrink: 0;
   min-height: 64px;
@@ -124,9 +130,9 @@ table, .tabular, .text-3xl, .text-2xl { font-variant-numeric: tabular-nums; }
 
 /* Barra lateral flotante */
 .menu-lateral {
-  top: 96px;
-  bottom: 16px;
-  left: 16px;
+  min-width: 0;
+  min-height: 0;
+  margin-top: 16px;
   background: var(--material);
   -webkit-backdrop-filter: saturate(180%) blur(20px);
   backdrop-filter: saturate(180%) blur(20px);
@@ -134,12 +140,11 @@ table, .tabular, .text-3xl, .text-2xl { font-variant-numeric: tabular-nums; }
   border-radius: 20px;
   overflow: hidden;
   box-shadow: var(--sombra-tarjeta), inset 0 0 0 .5px rgba(0, 0, 0, .06);
-  transition: width 320ms var(--ease-apple);
 }
 .marca-lateral { height: auto; padding: 18px 20px 6px; }
 .marca-lateral p:first-child { font-size: 11px; color: var(--texto-2); font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
 .marca-lateral p:last-child { display: none; }
-.menu-lateral.w-20 .marca-lateral { padding: 8px; }
+.menu-lateral.menu-colapsado .marca-lateral { padding: 8px; }
 .menu-lateral nav { padding: 8px 12px; }
 .titulo-seccion-menu {
   display: block;
@@ -154,7 +159,7 @@ table, .tabular, .text-3xl, .text-2xl { font-variant-numeric: tabular-nums; }
   transition: opacity 180ms ease, max-height 260ms var(--ease-apple), padding 260ms var(--ease-apple);
   max-height: 40px;
 }
-.menu-lateral.w-20 .titulo-seccion-menu { opacity: 0; max-height: 8px; padding: 4px 0; }
+.menu-lateral.menu-colapsado .titulo-seccion-menu { opacity: 0; max-height: 8px; padding: 4px 0; }
 .menu-lateral nav a {
   min-height: 40px;
   border-radius: 11px;
@@ -181,11 +186,8 @@ table, .tabular, .text-3xl, .text-2xl { font-variant-numeric: tabular-nums; }
   min-width: 0;
   overflow-y: auto;
   scrollbar-gutter: stable;
-  transition: margin 320ms var(--ease-apple);
 }
-.menu-amplio { margin-left: 272px; }
-.menu-compacto { margin-left: 96px; }
-.contenido-pagina { min-width: 0; max-width: 1440px; padding: 36px 16px 32px 8px; }
+.contenido-pagina { min-width: 0; padding: 36px 16px 32px; }
 
 /* ════════════════ Tipografía (escala de Apple) ════════════════ */
 /* Large Title: el título de cada pantalla */
@@ -535,15 +537,15 @@ table, .tabular, .text-3xl, .text-2xl { font-variant-numeric: tabular-nums; }
     transform 280ms var(--ease-apple) 60ms,
     max-width 320ms var(--ease-apple);
 }
-.menu-lateral.w-20 .texto-menu {
+.menu-lateral.menu-colapsado .texto-menu {
   max-width: 0;
   opacity: 0;
   transform: translateX(-6px);
   transition: opacity 100ms ease, transform 160ms ease, max-width 280ms var(--ease-apple);
 }
-.menu-lateral.w-20 nav a, .menu-lateral.w-20 .alternar-menu { gap: 0; justify-content: center; }
+.menu-lateral.menu-colapsado nav a, .menu-lateral.menu-colapsado .alternar-menu { gap: 0; justify-content: center; }
 .icono-alternar { transition: transform 320ms var(--ease-apple); }
-.menu-lateral.w-20 .icono-alternar { transform: rotate(180deg); }
+.menu-lateral.menu-colapsado .icono-alternar { transform: rotate(180deg); }
 .marca-lateral .texto-menu { max-width: 200px; }
 
 /* Campanita: un balanceo único cuando hay alertas nuevas */
@@ -552,37 +554,40 @@ table, .tabular, .text-3xl, .text-2xl { font-variant-numeric: tabular-nums; }
 
 /* ════════════════ Adaptación al ancho disponible ════════════════ */
 @media (min-width: 1600px) {
-  .contenido-pagina { padding: 44px 24px 40px 16px; }
+  .contenido-pagina { padding: 44px 16px 40px; }
 }
 @media (max-width: 1100px) {
   .marca-sistema > span:last-child { display: none; }
-  .menu-lateral.w-64 { width: 224px; }
-  .menu-amplio { margin-left: 248px; }
+  .disposicion-principal.menu-amplio { --ancho-menu: 224px; }
 }
 @media (max-width: 767px) {
   .sistema-theme { margin: 8px; min-height: calc(100dvh - 16px); }
-  .disposicion-principal { height: calc(100dvh - 16px); }
+  .disposicion-principal, .disposicion-principal.menu-amplio {
+    --ancho-menu: 56px;
+    column-gap: 8px;
+    height: calc(100dvh - 16px);
+  }
   .encabezado-sistema { padding: 8px 10px; gap: 8px; min-height: 56px; border-radius: 16px; }
   .botica-encabezado { background: transparent; padding: 0; min-width: 0; flex: 1; }
   .botica-encabezado > span, .marca-sistema { display: none; }
-  .botica-encabezado p { max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .botica-encabezado > div { min-width: 0; }
+  .botica-encabezado p { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .acciones-encabezado { gap: 8px; }
   .acciones-encabezado > div { gap: 8px; padding-left: 8px; }
-  .menu-lateral, .menu-lateral.w-64 { top: 76px; bottom: 12px; left: 8px; width: 56px; border-radius: 18px; }
+  .menu-lateral { margin-top: 12px; border-radius: 18px; }
   .menu-lateral .marca-lateral, .titulo-seccion-menu { display: none; }
   .menu-lateral nav { padding: 8px; }
   .menu-lateral nav a { padding: 8px; justify-content: center; min-height: 40px; }
   .menu-lateral nav a span, .alternar-menu { display: none; }
-  .menu-amplio, .menu-compacto { margin-left: 72px; }
   .contenido-pagina { padding: 24px 4px 16px 4px; }
   .contenido-pagina h1 { font-size: 28px; }
   .sistema-theme .tarjeta-kpi, .sistema-theme .bg-white.p-5 { padding: 16px; }
   .inicio-sesion > div { padding: 28px 22px; }
 }
 @media print {
-  .disposicion-principal { height: auto; overflow: visible; margin: 0; padding: 0; }
+  .disposicion-principal { display: block; height: auto; overflow: visible; margin: 0; padding: 0; }
   .disposicion-principal > .encabezado-sistema, .disposicion-principal > .menu-lateral { display: none; }
-  .contenido-sistema { overflow: visible; margin-left: 0; }
+  .contenido-sistema { overflow: visible; }
 }
 /* Accesibilidad: sin movimiento ni transparencias si el usuario lo pide */
 @media (prefers-reduced-motion: reduce) {

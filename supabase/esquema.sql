@@ -1,5 +1,5 @@
 -- ============================================================================
---  SISTEMA SAAS MULTI-TENANT DE GESTIÓN PARA BOTICAS  —  ESQUEMA v2
+--  SISTEMA MULTI-TENANT DE GESTIÓN PARA BOTICAS  —  ESQUEMA v2
 --  Inventario · Kardex · Ventas (POS) · Reportes · Merma
 --  Base de datos: Supabase (PostgreSQL 15+)
 --
@@ -50,7 +50,7 @@ create type estado_alerta as enum ('ACTIVA', 'RESUELTA');
 
 
 -- ============================================================
--- 2) `boticas` — el inquilino (tenant) del SaaS
+-- 2) `boticas` — el inquilino (tenant) del sistema
 -- ============================================================
 create table boticas (
   id                       uuid primary key default gen_random_uuid(),
@@ -66,7 +66,7 @@ create table boticas (
   actualizado_en           timestamptz not null default now()
 );
 
-comment on table boticas is 'Organizaciones (tenants) del SaaS. Cada botica es independiente.';
+comment on table boticas is 'Organizaciones (tenants) del sistema. Cada botica es independiente.';
 
 
 -- ============================================================
@@ -132,6 +132,7 @@ create table productos (
   nombre           text not null,
   presentacion     text,
   laboratorio      text,
+  imagen_url       text,
   requiere_receta  boolean not null default false,
 
   -- ---- Empaque y precios (requisito: venta por caja y por blíster) ----
@@ -379,7 +380,8 @@ select
     when (s.proxima_fecha_vencimiento - current_date) <= b.dias_alerta_vencimiento
       then 'AMARILLO'
     else 'VERDE'
-  end as estado_vencimiento
+  end as estado_vencimiento,
+  p.imagen_url
 from productos p
 join boticas b            on b.id = p.botica_id
 join stock_por_producto s on s.producto_id = p.id

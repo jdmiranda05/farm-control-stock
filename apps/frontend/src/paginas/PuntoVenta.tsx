@@ -23,6 +23,7 @@ import {
   type ResultadoVenta,
 } from '@botica/comun';
 import { api } from '../lib/api';
+import { VistaPreviaProducto } from '../componentes/ui/VistaPreviaProducto';
 import { EsqueletoPuntoVenta } from '../componentes/ui/Esqueleto';
 import { ControlSegmentado } from '../componentes/ui/ControlSegmentado';
 import { useConfirmacion } from '../componentes/ui/DialogoConfirmacion';
@@ -333,14 +334,17 @@ export function PuntoVenta() {
                     }`}
                   >
                     <div className="min-w-0">
-                      <p className="truncate font-medium text-gray-900">
-                        {producto.nombre}
-                        {producto.requiere_receta && (
-                          <span className="ml-2 rounded bg-purple-50 px-1.5 py-0.5 text-[10px] font-bold text-purple-700">
-                            RECETA
-                          </span>
-                        )}
-                      </p>
+                      <div className="flex min-w-0 items-center gap-1">
+                        <p className="truncate font-medium text-gray-900">
+                          {producto.nombre}
+                          {producto.requiere_receta && (
+                            <span className="ml-2 rounded bg-purple-50 px-1.5 py-0.5 text-[10px] font-bold text-purple-700">
+                              RECETA
+                            </span>
+                          )}
+                        </p>
+                        <VistaPreviaProducto producto={producto} />
+                      </div>
                       <p className="text-xs text-gray-500">
                         {producto.codigo ?? 'sin código'} ·{' '}
                         {formatearStock(producto.stock_blisters, producto.unidades_por_caja)}
@@ -410,9 +414,12 @@ export function PuntoVenta() {
                   <li key={`${linea.producto.id}-${linea.modalidad}`} className="aparecer px-5 py-3">
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-medium text-gray-900">
-                          {linea.producto.nombre}
-                        </p>
+                        <div className="flex min-w-0 items-center gap-1">
+                          <p className="truncate text-sm font-medium text-gray-900">
+                            {linea.producto.nombre}
+                          </p>
+                          <VistaPreviaProducto producto={linea.producto} />
+                        </div>
                         <p className="text-xs text-gray-500">
                           {nombreModalidad(linea.producto, linea.modalidad)} ·{' '}
                           {formatearSoles(linea.precioUnitario)} c/u

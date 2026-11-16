@@ -34,7 +34,7 @@ const ESTILO_TIPO = {
 const INTERVALO_REFRESCO_MS = 60_000;
 
 /** Máximo de alertas por página (el backend tampoco acepta más). */
-const ALERTAS_POR_PAGINA = 30;
+const ALERTAS_POR_PAGINA = 15;
 
 /**
  * Página "Alertas": centro de notificaciones del sistema.
@@ -277,7 +277,7 @@ export function Alertas() {
           })}
         </ul>
 
-        {/* Paginación: máximo 30 alertas por página */}
+        {/* Paginación: máximo 15 alertas por página */}
         {resultado && resultado.totalPaginas > 1 && (
           <div className="overflow-hidden rounded-xl bg-white shadow-sm">
             <Paginacion

@@ -309,9 +309,7 @@ export function EsqueletoConfiguracion() {
   return (
     <Contenedor etiqueta="Cargando configuración…">
       <EsqueletoEncabezado />
-      <div className="max-w-2xl">
-        <EsqueletoFormulario campos={5} />
-      </div>
+      <EsqueletoFormulario campos={5} />
     </Contenedor>
   );
 }
@@ -332,12 +330,12 @@ export function EsqueletoSistema() {
           <Esqueleto className="h-9 w-9 rounded-full" />
         </div>
       </div>
-      <div className="menu-lateral fixed z-40 flex w-20 flex-col items-center gap-3 px-3 py-8">
+      <div className="menu-lateral z-40 flex flex-col items-center gap-3 px-3 py-8">
         {Array.from({ length: 6 }).map((_, i) => (
           <Esqueleto key={i} className="h-11 w-11 rounded-full" />
         ))}
       </div>
-      <div className="contenido-sistema menu-compacto flex flex-col">
+      <div className="contenido-sistema flex flex-col">
         <main className="contenido-pagina flex-1">
           <EsqueletoPanel />
         </main>

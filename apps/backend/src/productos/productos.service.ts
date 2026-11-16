@@ -151,6 +151,7 @@ export class ProductosService {
       categoria_id: dto.categoriaId ?? null,
       presentacion: this.texto(dto.presentacion),
       laboratorio: this.texto(dto.laboratorio),
+      ...(dto.imagenUrl ? { imagen_url: dto.imagenUrl } : {}),
       unidades_por_caja: empaque.unidadesPorCaja,
       precio_caja: empaque.precioCaja,
       precio_blister: empaque.precioBlister,
@@ -188,6 +189,9 @@ export class ProductosService {
     }
     if (dto.categoriaId !== undefined) cambios.categoria_id = dto.categoriaId || null;
     if (dto.presentacion !== undefined) cambios.presentacion = this.texto(dto.presentacion);
+    if (dto.imagenUrl !== undefined && (dto.imagenUrl !== null || actual.imagen_url != null)) {
+      cambios.imagen_url = dto.imagenUrl;
+    }
     if (dto.laboratorio !== undefined) cambios.laboratorio = this.texto(dto.laboratorio);
     if (dto.stockMinimo !== undefined) cambios.stock_minimo = dto.stockMinimo;
 

@@ -221,181 +221,183 @@ export function ReporteDiario() {
         />
       </div>
 
-      {/* ══════ Tabla detallada de movimientos ══════ */}
-      <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
-        <div className="border-b border-gray-100 px-5 py-4">
-          <h2 className="font-semibold text-gray-900">Detalle de movimientos</h2>
-          <p className="text-xs text-gray-500">
-            Hora, producto, tipo, cantidad, lote, responsable y proveedor
-          </p>
+      <div className="grid items-start gap-4 [grid-template-columns:repeat(auto-fit,minmax(min(100%,34rem),1fr))] print:grid-cols-1">
+        {/* ══════ Tabla detallada de movimientos ══════ */}
+        <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
+          <div className="border-b border-gray-100 px-5 py-4">
+            <h2 className="font-semibold text-gray-900">Detalle de movimientos</h2>
+            <p className="text-xs text-gray-500">
+              Hora, producto, tipo, cantidad, lote, responsable y proveedor
+            </p>
+          </div>
+
+          {movimientos.datos.length === 0 ? (
+            <p className="px-5 py-10 text-center text-sm text-gray-500">
+              No hubo movimientos en el periodo seleccionado.
+            </p>
+          ) : (
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-100 text-left text-xs uppercase tracking-wide text-gray-500">
+                      <th className="px-5 py-3">Hora</th>
+                      <th className="px-5 py-3">Producto</th>
+                      <th className="px-5 py-3">Tipo</th>
+                      <th className="px-5 py-3 text-center">Cantidad</th>
+                      <th className="px-5 py-3">Lote</th>
+                      <th className="px-5 py-3">Responsable</th>
+                      <th className="px-5 py-3">Proveedor</th>
+                      <th className="px-5 py-3 text-right">Valor</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {movimientos.datos.map((movimiento) => {
+                      const etiqueta = ETIQUETA_TIPO[movimiento.tipo];
+                      const entrada = movimiento.tipo === TipoMovimientoKardex.ENTRADA_MANUAL;
+                      return (
+                        <tr key={movimiento.id} className="hover:bg-gray-50">
+                          <td className="whitespace-nowrap px-5 py-3 text-gray-600">
+                            {new Date(movimiento.creado_en).toLocaleTimeString('es-PE', {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                            {!esUnSoloDia && (
+                              <p className="text-xs text-gray-400">
+                                {new Date(movimiento.creado_en).toLocaleDateString('es-PE')}
+                              </p>
+                            )}
+                          </td>
+                          <td className="px-5 py-3 font-medium text-gray-900">
+                            {movimiento.producto?.nombre ?? '—'}
+                          </td>
+                          <td className="px-5 py-3">
+                            <span
+                              className={`whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium ${etiqueta.clases}`}
+                            >
+                              {etiqueta.texto}
+                            </span>
+                          </td>
+                          <td className="px-5 py-3 text-center">
+                            <span
+                              className={`font-semibold ${entrada ? 'text-emerald-600' : 'text-gray-800'}`}
+                            >
+                              {entrada ? '+' : '−'}
+                              {movimiento.cantidad}
+                            </span>
+                            <span className="text-xs text-gray-400">
+                              {' '}
+                              {textoCantidad(movimiento.cantidad, movimiento.unidad, movimiento.producto)
+                                .split(' ')
+                                .slice(1)
+                                .join(' ')}
+                            </span>
+                          </td>
+                          <td className="px-5 py-3 text-gray-600">
+                            {movimiento.lote?.numero_lote ?? '—'}
+                          </td>
+                          <td className="px-5 py-3 text-gray-600">
+                            {movimiento.usuario?.nombre_completo ?? 'Sistema'}
+                          </td>
+                          <td className="px-5 py-3 text-gray-600">
+                            {movimiento.proveedor?.nombre ?? '—'}
+                          </td>
+                          <td className="px-5 py-3 text-right font-medium text-gray-700">
+                            {formatearSoles(movimiento.valor_soles)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="print:hidden">
+                <Paginacion
+                  pagina={movimientos.pagina}
+                  totalPaginas={movimientos.totalPaginas}
+                  total={movimientos.total}
+                  porPagina={movimientos.porPagina}
+                  onCambiar={setPagina}
+                />
+              </div>
+            </>
+          )}
         </div>
 
-        {movimientos.datos.length === 0 ? (
-          <p className="px-5 py-10 text-center text-sm text-gray-500">
-            No hubo movimientos en el periodo seleccionado.
-          </p>
-        ) : (
-          <>
+        {/* ══════ Merma económica acumulada ══════ */}
+        {merma && (merma.totalRegistradaSoles > 0 || merma.totalPotencialSoles > 0) && (
+          <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
+            <div className="border-b border-gray-100 px-5 py-4">
+              <h2 className="flex items-center gap-2 font-semibold text-gray-900">
+                <TriangleAlert className="h-4 w-4 text-red-500" />
+                Merma económica acumulada
+              </h2>
+              <p className="text-xs text-gray-500">
+                Pérdidas históricas por medicamentos vencidos o dañados, valorizadas al costo
+                de compra
+              </p>
+            </div>
+
+            <div className="grid gap-4 border-b border-gray-100 p-5 sm:grid-cols-2">
+              <div className="rounded-lg bg-red-50 p-4">
+                <p className="text-xs font-medium text-red-700">Merma ya declarada</p>
+                <p className="mt-1 text-2xl font-bold text-red-700">
+                  {formatearSoles(merma.totalRegistradaSoles)}
+                </p>
+                <p className="mt-1 text-xs text-red-600">
+                  Mercadería retirada y registrada como pérdida
+                </p>
+              </div>
+              <div className="rounded-lg bg-amber-50 p-4">
+                <p className="text-xs font-medium text-amber-700">Merma potencial</p>
+                <p className="mt-1 text-2xl font-bold text-amber-700">
+                  {formatearSoles(merma.totalPotencialSoles)}
+                </p>
+                <p className="mt-1 text-xs text-amber-600">
+                  Producto vencido que sigue en almacén sin declararse
+                </p>
+              </div>
+            </div>
+
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-100 text-left text-xs uppercase tracking-wide text-gray-500">
-                    <th className="px-5 py-3">Hora</th>
                     <th className="px-5 py-3">Producto</th>
-                    <th className="px-5 py-3">Tipo</th>
-                    <th className="px-5 py-3 text-center">Cantidad</th>
-                    <th className="px-5 py-3">Lote</th>
-                    <th className="px-5 py-3">Responsable</th>
-                    <th className="px-5 py-3">Proveedor</th>
-                    <th className="px-5 py-3 text-right">Valor</th>
+                    <th className="px-5 py-3 text-center">Blísters perdidos</th>
+                    <th className="px-5 py-3 text-right">Merma declarada</th>
+                    <th className="px-5 py-3 text-center">Vencidos sin declarar</th>
+                    <th className="px-5 py-3 text-right">Merma potencial</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
-                  {movimientos.datos.map((movimiento) => {
-                    const etiqueta = ETIQUETA_TIPO[movimiento.tipo];
-                    const entrada = movimiento.tipo === TipoMovimientoKardex.ENTRADA_MANUAL;
-                    return (
-                      <tr key={movimiento.id} className="hover:bg-gray-50">
-                        <td className="whitespace-nowrap px-5 py-3 text-gray-600">
-                          {new Date(movimiento.creado_en).toLocaleTimeString('es-PE', {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
-                          {!esUnSoloDia && (
-                            <p className="text-xs text-gray-400">
-                              {new Date(movimiento.creado_en).toLocaleDateString('es-PE')}
-                            </p>
-                          )}
-                        </td>
-                        <td className="px-5 py-3 font-medium text-gray-900">
-                          {movimiento.producto?.nombre ?? '—'}
-                        </td>
-                        <td className="px-5 py-3">
-                          <span
-                            className={`whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium ${etiqueta.clases}`}
-                          >
-                            {etiqueta.texto}
-                          </span>
-                        </td>
-                        <td className="px-5 py-3 text-center">
-                          <span
-                            className={`font-semibold ${entrada ? 'text-emerald-600' : 'text-gray-800'}`}
-                          >
-                            {entrada ? '+' : '−'}
-                            {movimiento.cantidad}
-                          </span>
-                          <span className="text-xs text-gray-400">
-                            {' '}
-                            {textoCantidad(movimiento.cantidad, movimiento.unidad, movimiento.producto)
-                              .split(' ')
-                              .slice(1)
-                              .join(' ')}
-                          </span>
-                        </td>
-                        <td className="px-5 py-3 text-gray-600">
-                          {movimiento.lote?.numero_lote ?? '—'}
-                        </td>
-                        <td className="px-5 py-3 text-gray-600">
-                          {movimiento.usuario?.nombre_completo ?? 'Sistema'}
-                        </td>
-                        <td className="px-5 py-3 text-gray-600">
-                          {movimiento.proveedor?.nombre ?? '—'}
-                        </td>
-                        <td className="px-5 py-3 text-right font-medium text-gray-700">
-                          {formatearSoles(movimiento.valor_soles)}
-                        </td>
-                      </tr>
-                    );
-                  })}
+                  {merma.productos.map((item) => (
+                    <tr key={item.producto_id} className="hover:bg-gray-50">
+                      <td className="px-5 py-3">
+                        <p className="font-medium text-gray-900">{item.producto_nombre}</p>
+                        <p className="text-xs text-gray-400">{item.codigo ?? 'sin código'}</p>
+                      </td>
+                      <td className="px-5 py-3 text-center text-gray-700">
+                        {item.blisters_merma_registrada}
+                      </td>
+                      <td className="px-5 py-3 text-right font-medium text-red-600">
+                        {formatearSoles(item.merma_registrada_soles)}
+                      </td>
+                      <td className="px-5 py-3 text-center text-gray-700">
+                        {item.blisters_vencidos_sin_declarar}
+                      </td>
+                      <td className="px-5 py-3 text-right font-medium text-amber-600">
+                        {formatearSoles(item.merma_potencial_soles)}
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
-
-            <div className="print:hidden">
-              <Paginacion
-                pagina={movimientos.pagina}
-                totalPaginas={movimientos.totalPaginas}
-                total={movimientos.total}
-                porPagina={movimientos.porPagina}
-                onCambiar={setPagina}
-              />
-            </div>
-          </>
+          </div>
         )}
       </div>
-
-      {/* ══════ Merma económica acumulada ══════ */}
-      {merma && (merma.totalRegistradaSoles > 0 || merma.totalPotencialSoles > 0) && (
-        <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
-          <div className="border-b border-gray-100 px-5 py-4">
-            <h2 className="flex items-center gap-2 font-semibold text-gray-900">
-              <TriangleAlert className="h-4 w-4 text-red-500" />
-              Merma económica acumulada
-            </h2>
-            <p className="text-xs text-gray-500">
-              Pérdidas históricas por medicamentos vencidos o dañados, valorizadas al costo
-              de compra
-            </p>
-          </div>
-
-          <div className="grid gap-4 border-b border-gray-100 p-5 sm:grid-cols-2">
-            <div className="rounded-lg bg-red-50 p-4">
-              <p className="text-xs font-medium text-red-700">Merma ya declarada</p>
-              <p className="mt-1 text-2xl font-bold text-red-700">
-                {formatearSoles(merma.totalRegistradaSoles)}
-              </p>
-              <p className="mt-1 text-xs text-red-600">
-                Mercadería retirada y registrada como pérdida
-              </p>
-            </div>
-            <div className="rounded-lg bg-amber-50 p-4">
-              <p className="text-xs font-medium text-amber-700">Merma potencial</p>
-              <p className="mt-1 text-2xl font-bold text-amber-700">
-                {formatearSoles(merma.totalPotencialSoles)}
-              </p>
-              <p className="mt-1 text-xs text-amber-600">
-                Producto vencido que sigue en almacén sin declararse
-              </p>
-            </div>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-100 text-left text-xs uppercase tracking-wide text-gray-500">
-                  <th className="px-5 py-3">Producto</th>
-                  <th className="px-5 py-3 text-center">Blísters perdidos</th>
-                  <th className="px-5 py-3 text-right">Merma declarada</th>
-                  <th className="px-5 py-3 text-center">Vencidos sin declarar</th>
-                  <th className="px-5 py-3 text-right">Merma potencial</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {merma.productos.map((item) => (
-                  <tr key={item.producto_id} className="hover:bg-gray-50">
-                    <td className="px-5 py-3">
-                      <p className="font-medium text-gray-900">{item.producto_nombre}</p>
-                      <p className="text-xs text-gray-400">{item.codigo ?? 'sin código'}</p>
-                    </td>
-                    <td className="px-5 py-3 text-center text-gray-700">
-                      {item.blisters_merma_registrada}
-                    </td>
-                    <td className="px-5 py-3 text-right font-medium text-red-600">
-                      {formatearSoles(item.merma_registrada_soles)}
-                    </td>
-                    <td className="px-5 py-3 text-center text-gray-700">
-                      {item.blisters_vencidos_sin_declarar}
-                    </td>
-                    <td className="px-5 py-3 text-right font-medium text-amber-600">
-                      {formatearSoles(item.merma_potencial_soles)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

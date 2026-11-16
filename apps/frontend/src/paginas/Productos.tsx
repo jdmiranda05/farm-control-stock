@@ -28,6 +28,7 @@ import {
   type RespuestaPaginada,
 } from '@botica/comun';
 import { api } from '../lib/api';
+import { VistaPreviaProducto } from '../componentes/ui/VistaPreviaProducto';
 import { Selector } from '../componentes/ui/Selector';
 import { EtiquetaEstado } from '../componentes/ui/EtiquetaEstado';
 import { EsqueletoProductos, EsqueletoTabla } from '../componentes/ui/Esqueleto';
@@ -45,6 +46,7 @@ interface FormularioProducto {
   categoriaId: string;
   presentacion: string;
   laboratorio: string;
+  imagenUrl: string;
   tieneBlisters: boolean;
   unidadesPorCaja: string;
   precioCaja: string;
@@ -61,6 +63,7 @@ const FORMULARIO_VACIO: FormularioProducto = {
   categoriaId: '',
   presentacion: '',
   laboratorio: '',
+  imagenUrl: '',
   tieneBlisters: true,
   unidadesPorCaja: '10',
   precioCaja: '',
@@ -90,6 +93,10 @@ function validarFormulario(f: FormularioProducto): string[] {
   const errores: string[] = [];
   if (!f.nombre.trim()) errores.push('El nombre del producto es obligatorio');
   if (f.nombre.trim().length > 120) errores.push('El nombre no puede superar 120 caracteres');
+  const imagenUrl = f.imagenUrl.trim();
+  if (imagenUrl && !/^https:\/\/\S+$/i.test(imagenUrl)) {
+    errores.push('Ingresa un enlace HTTPS válido para la imagen');
+  }
 
   const stockMinimo = Number(f.stockMinimo);
   if (f.stockMinimo === '' || !Number.isInteger(stockMinimo) || stockMinimo < 0) {
@@ -269,6 +276,7 @@ export function Productos() {
       categoriaId: producto.categoria_id ?? '',
       presentacion: producto.presentacion ?? '',
       laboratorio: producto.laboratorio ?? '',
+      imagenUrl: producto.imagen_url ?? '',
       tieneBlisters: conBlisters,
       unidadesPorCaja: String(producto.unidades_por_caja),
       precioCaja: String(producto.precio_caja),
@@ -301,6 +309,7 @@ export function Productos() {
       categoriaId: formulario.categoriaId || undefined,
       presentacion: formulario.presentacion.trim() || undefined,
       laboratorio: formulario.laboratorio.trim() || undefined,
+      imagenUrl: formulario.imagenUrl.trim() || null,
       tieneBlisters: formulario.tieneBlisters,
       unidadesPorCaja: formulario.tieneBlisters ? Number(formulario.unidadesPorCaja) : 1,
       precioCaja: Number(formulario.precioCaja),
@@ -589,7 +598,10 @@ export function Productos() {
                 {inactivos.map((producto) => (
                   <li key={producto.id} className="flex items-center justify-between gap-4 px-5 py-3.5">
                     <div className="min-w-0">
-                      <p className="truncate font-medium text-gray-900">{producto.nombre}</p>
+                      <div className="flex min-w-0 items-center gap-1">
+                        <p className="truncate font-medium text-gray-900">{producto.nombre}</p>
+                        <VistaPreviaProducto producto={producto} />
+                      </div>
                       <p className="text-xs text-gray-500">
                         {producto.codigo ?? 'sin código'} ·{' '}
                         {producto.categoria_nombre ?? 'Sin categoría'} ·{' '}
@@ -719,14 +731,14 @@ export function Productos() {
       {/* ══════ Tabla del catálogo (30 por página) ══════ */}
       <div ref={inicioTabla} className="scroll-mt-4 rounded-xl border border-gray-200 bg-white shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 px-5 py-3">
-          <div className="flex min-w-[240px] flex-1 items-center gap-2">
+          <div className="flex min-w-0 flex-1 basis-60 items-center gap-2">
             <Search className="h-4 w-4 shrink-0 text-gray-400" />
             <input
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
               placeholder="Buscar por nombre, código, categoría o laboratorio…"
               aria-label="Buscar productos"
-              className="w-full max-w-md rounded-lg border border-gray-300 px-3 py-1.5 text-sm outline-none focus:border-emerald-500"
+              className="w-full min-w-0 max-w-md rounded-lg border border-gray-300 px-3 py-1.5 text-sm outline-none focus:border-emerald-500"
             />
           </div>
           <div className="flex items-center gap-2 text-xs text-gray-500">
@@ -777,14 +789,17 @@ export function Productos() {
                   return (
                     <tr key={producto.id} className="hover:bg-gray-50">
                       <td className="px-5 py-3">
-                        <p className="font-medium text-gray-900">
-                          {producto.nombre}
-                          {producto.requiere_receta && (
-                            <span className="ml-2 rounded bg-purple-50 px-1.5 py-0.5 text-[10px] font-bold text-purple-700">
-                              RECETA
-                            </span>
-                          )}
-                        </p>
+                        <div className="flex min-w-0 items-center gap-1">
+                          <p className="font-medium text-gray-900">
+                            {producto.nombre}
+                            {producto.requiere_receta && (
+                              <span className="ml-2 rounded bg-purple-50 px-1.5 py-0.5 text-[10px] font-bold text-purple-700">
+                                RECETA
+                              </span>
+                            )}
+                          </p>
+                          <VistaPreviaProducto producto={producto} />
+                        </div>
                         <p className="text-xs text-gray-400">
                           {producto.codigo ?? 'sin código'}
                           {producto.presentacion ? ` · ${producto.presentacion}` : ''}
@@ -999,6 +1014,20 @@ export function Productos() {
                   onChange={(e) => setFormulario({ ...f, laboratorio: e.target.value })}
                   placeholder="Genfar"
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                />
+              </div>
+              <div className="col-span-2">
+                <label htmlFor="producto-imagen" className="mb-1 block text-xs font-medium text-gray-600">
+                  Enlace de la imagen (opcional)
+                </label>
+                <input
+                  id="producto-imagen"
+                  type="url"
+                  maxLength={2048}
+                  placeholder="https://ejemplo.com/producto.jpg"
+                  value={f.imagenUrl}
+                  onChange={(e) => setFormulario({ ...f, imagenUrl: e.target.value })}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
                 />
               </div>
 

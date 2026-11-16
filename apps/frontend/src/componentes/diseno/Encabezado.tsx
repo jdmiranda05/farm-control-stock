@@ -49,9 +49,9 @@ export function Encabezado() {
         <span className="grid h-10 w-10 place-items-center rounded-full bg-emerald-600 text-white">
           <Cross className="h-6 w-6" aria-hidden="true" />
         </span>
-        <span className="text-lg font-semibold tracking-tight">Botica SaaS</span>
+        <span className="text-lg font-semibold tracking-tight">Botica</span>
       </div>
-      {/* Botica actual (inquilino activo del SaaS) */}
+      {/* Botica actual (inquilino activo del sistema) */}
       <div className="botica-encabezado flex items-center gap-3">
         <span className="grid h-9 w-9 place-items-center rounded-lg bg-emerald-50 text-emerald-600">
           <Building2 className="h-5 w-5" />
