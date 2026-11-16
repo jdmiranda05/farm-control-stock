@@ -1,5 +1,13 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { Categoria, Producto, ProductoConStock, validarEmpaque } from '@botica/comun';
+import {
+  Categoria,
+  Producto,
+  ProductoConStock,
+  RespuestaPaginada,
+  validarEmpaque,
+} from '@botica/comun';
+import { armarRespuestaPaginada, calcularRango } from '../comun/dto/paginacion.dto';
+import { FiltroProductosDto, MAXIMO_PRODUCTOS_POR_PAGINA } from './dto/filtro-productos.dto';
 import { SupabaseService } from '../supabase/supabase.service';
 import { CrearProductoDto } from './dto/crear-producto.dto';
 import { ActualizarProductoDto } from './dto/actualizar-producto.dto';
@@ -34,6 +42,46 @@ export class ProductosService {
     const { data, error } = await consulta;
     this.supabase.verificarError(error, 'listar productos');
     return (data ?? []) as ProductoConStock[];
+  }
+
+  /**
+   * Catálogo PAGINADO en el servidor (máximo 30 por página) para la pantalla
+   * "Productos y Categorías". La búsqueda y el filtro por categoría también
+   * los resuelve PostgreSQL, así funcionan sobre todo el catálogo y no solo
+   * sobre la página visible.
+   */
+  async listarPaginado(
+    boticaId: string,
+    filtros: FiltroProductosDto,
+  ): Promise<RespuestaPaginada<ProductoConStock>> {
+    const { pagina, porPagina, desde, hasta } = calcularRango({
+      pagina: filtros.pagina,
+      porPagina: Math.min(filtros.porPagina ?? MAXIMO_PRODUCTOS_POR_PAGINA, MAXIMO_PRODUCTOS_POR_PAGINA),
+    });
+
+    let consulta = this.supabase.cliente
+      .from('vista_stock_productos')
+      .select('*', { count: 'exact' })
+      .eq('botica_id', boticaId)
+      .eq('activo', true);
+
+    if (filtros.categoriaId) consulta = consulta.eq('categoria_id', filtros.categoriaId);
+
+    // Se quitan los caracteres que tienen significado en el filtro `or` de PostgREST
+    const texto = (filtros.busqueda ?? '').replace(/[,()%*\\]/g, ' ').trim();
+    if (texto) {
+      const patron = `%${texto}%`;
+      consulta = consulta.or(
+        `nombre.ilike.${patron},codigo.ilike.${patron},laboratorio.ilike.${patron},categoria_nombre.ilike.${patron}`,
+      );
+    }
+
+    const { data, error, count } = await consulta
+      .order('nombre', { ascending: true })
+      .order('id', { ascending: true }) // orden estable entre páginas
+      .range(desde, hasta);
+    this.supabase.verificarError(error, 'listar el catálogo');
+    return armarRespuestaPaginada((data ?? []) as ProductoConStock[], count ?? 0, pagina, porPagina);
   }
 
   /** Productos desactivados: alimenta el panel de reactivación del ADMIN. */

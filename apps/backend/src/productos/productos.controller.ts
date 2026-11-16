@@ -15,6 +15,7 @@ import { UsuarioActual } from '../autenticacion/decoradores/usuario-actual.decor
 import { ProductosService } from './productos.service';
 import { CrearProductoDto } from './dto/crear-producto.dto';
 import { ActualizarProductoDto } from './dto/actualizar-producto.dto';
+import { FiltroProductosDto } from './dto/filtro-productos.dto';
 
 /**
  * Endpoints del catálogo de productos.
@@ -41,6 +42,16 @@ export class ProductosController {
     @Query('incluirInactivos') incluirInactivos?: string,
   ) {
     return this.servicio.listar(usuario.botica_id, incluirInactivos === 'true');
+  }
+
+  /**
+   * GET /api/productos/paginado?pagina=&porPagina=&busqueda=&categoriaId=
+   * Catálogo por páginas (máximo 30) para la pantalla de Productos. El POS y
+   * el inventario siguen usando GET /api/productos, que trae la lista completa.
+   */
+  @Get('paginado')
+  listarPaginado(@UsuarioActual() usuario: PerfilUsuario, @Query() filtros: FiltroProductosDto) {
+    return this.servicio.listarPaginado(usuario.botica_id, filtros);
   }
 
   /** GET /api/productos/inactivos — productos dados de baja (para reactivarlos). */

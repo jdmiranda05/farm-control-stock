@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import {
   ArchiveRestore,
   Check,
@@ -25,11 +25,13 @@ import {
   validarEmpaque,
   type Categoria,
   type ProductoConStock,
+  type RespuestaPaginada,
 } from '@botica/comun';
 import { api } from '../lib/api';
 import { Selector } from '../componentes/ui/Selector';
 import { EtiquetaEstado } from '../componentes/ui/EtiquetaEstado';
-import { EsqueletoProductos } from '../componentes/ui/Esqueleto';
+import { EsqueletoProductos, EsqueletoTabla } from '../componentes/ui/Esqueleto';
+import { Paginacion } from '../componentes/ui/Paginacion';
 import { useConfirmacion } from '../componentes/ui/DialogoConfirmacion';
 import { ControlSegmentado } from '../componentes/ui/ControlSegmentado';
 import { useAutenticacion } from '../contexto/ContextoAutenticacion';
@@ -123,11 +125,19 @@ export function Productos() {
   const puedeCrear = puedeCrearEnCatalogo(perfil);
   const puedeEditar = puedeEditarCatalogo(perfil);
 
-  const [productos, setProductos] = useState<ProductoConStock[] | null>(null);
+  // Catálogo paginado en el servidor: máximo 30 productos por página
+  const [resultado, setResultado] = useState<RespuestaPaginada<ProductoConStock> | null>(null);
+  const [pagina, setPagina] = useState(1);
+  const [cargandoPagina, setCargandoPagina] = useState(false);
+  const [categoriaFiltro, setCategoriaFiltro] = useState<string>('');
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [mensaje, setMensaje] = useState<string | null>(null);
   const [busqueda, setBusqueda] = useState('');
+  const [busquedaAplicada, setBusquedaAplicada] = useState('');
+  const [recarga, setRecarga] = useState(0);
+  const inicioTabla = useRef<HTMLDivElement>(null);
+  const productos = resultado?.datos ?? null;
 
   const [formulario, setFormulario] = useState<FormularioProducto | null>(null);
   const [erroresFormulario, setErroresFormulario] = useState<string[]>([]);
@@ -144,29 +154,85 @@ export function Productos() {
   const [inactivos, setInactivos] = useState<ProductoConStock[]>([]);
   const { confirmar, dialogo } = useConfirmacion();
 
-  const cargar = useCallback(() => {
+  /** Vuelve a pedir la página actual, las categorías y los deshabilitados. */
+  const cargar = useCallback(() => setRecarga((n) => n + 1), []);
+
+  // Categorías y productos deshabilitados (no dependen de la página)
+  useEffect(() => {
     Promise.all([
-      api.get<ProductoConStock[]>('/productos'),
       api.get<Categoria[]>(`/categorias${puedeEditar ? '?incluirInactivas=true' : ''}`),
       puedeEditar
         ? api.get<ProductoConStock[]>('/productos/inactivos')
         : Promise.resolve([] as ProductoConStock[]),
     ])
-      .then(([listaProductos, listaCategorias, listaInactivos]) => {
-        setProductos(listaProductos);
+      .then(([listaCategorias, listaInactivos]) => {
         setCategorias(listaCategorias);
         setInactivos(listaInactivos);
       })
-      .catch((e: Error) => {
-        setError(e.message);
-        setProductos((actual) => actual ?? []);
+      .catch((e: Error) => setError(e.message));
+  }, [puedeEditar, recarga]);
+
+  // La búsqueda se aplica 300 ms después de dejar de escribir y vuelve a la página 1
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const texto = busqueda.trim();
+      setBusquedaAplicada((anterior) => {
+        if (anterior !== texto) {
+          setPagina(1);
+          setCargandoPagina(true);
+        }
+        return texto;
       });
-  }, [puedeEditar]);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [busqueda]);
+
+  // Página del catálogo (búsqueda y categoría las filtra el servidor)
+  useEffect(() => {
+    let cancelado = false;
+    const parametros = new URLSearchParams({ pagina: String(pagina), porPagina: '30' });
+    if (busquedaAplicada) parametros.set('busqueda', busquedaAplicada);
+    if (categoriaFiltro) parametros.set('categoriaId', categoriaFiltro);
+    api
+      .get<RespuestaPaginada<ProductoConStock>>(`/productos/paginado?${parametros}`)
+      .then((respuesta) => {
+        if (cancelado) return;
+        // Si la página quedó vacía (p. ej. tras deshabilitar el último), ir a la anterior
+        if (respuesta.datos.length === 0 && pagina > 1 && respuesta.total > 0) {
+          setPagina(respuesta.totalPaginas);
+          return;
+        }
+        setResultado(respuesta);
+      })
+      .catch((e: Error) => {
+        if (cancelado) return;
+        setError(e.message);
+        setResultado(
+          (actual) => actual ?? { datos: [], total: 0, pagina: 1, porPagina: 30, totalPaginas: 1 },
+        );
+      })
+      .finally(() => {
+        if (!cancelado) setCargandoPagina(false);
+      });
+    return () => {
+      cancelado = true;
+    };
+  }, [pagina, busquedaAplicada, categoriaFiltro, recarga]);
+
+  function irAPagina(nueva: number) {
+    setCargandoPagina(true);
+    setPagina(nueva);
+    inicioTabla.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function filtrarPorCategoria(id: string) {
+    setCargandoPagina(true);
+    setCategoriaFiltro((actual) => (actual === id ? '' : id));
+    setPagina(1);
+  }
 
   const categoriasActivas = categorias.filter((c) => c.activa !== false);
   const categoriasInactivas = categorias.filter((c) => c.activa === false);
-
-  useEffect(cargar, [cargar]);
 
   // Mensajes de éxito: se ocultan solos
   useEffect(() => {
@@ -180,18 +246,9 @@ export function Productos() {
     if (formulario && intentoGuardar) setErroresFormulario(validarFormulario(formulario));
   }, [formulario, intentoGuardar]);
 
-  const filtrados = useMemo(() => {
-    if (!productos) return [];
-    const texto = busqueda.trim().toLowerCase();
-    if (!texto) return productos;
-    return productos.filter(
-      (p) =>
-        p.nombre.toLowerCase().includes(texto) ||
-        (p.codigo ?? '').toLowerCase().includes(texto) ||
-        (p.categoria_nombre ?? '').toLowerCase().includes(texto) ||
-        (p.laboratorio ?? '').toLowerCase().includes(texto),
-    );
-  }, [productos, busqueda]);
+  const filtrados = productos ?? [];
+  const total = resultado?.total ?? 0;
+  const hayFiltros = !!busquedaAplicada || !!categoriaFiltro;
 
   function abrirNuevo() {
     setError(null);
@@ -367,7 +424,13 @@ export function Productos() {
 
   /** Deshabilitar categoría (baja lógica): operación exclusiva del ADMIN. */
   async function desactivarCategoria(categoria: Categoria) {
-    const usos = productos?.filter((p) => p.categoria_id === categoria.id).length ?? 0;
+    // Cuántos productos usan la categoría (lo cuenta el servidor sobre todo el catálogo)
+    const usos = await api
+      .get<RespuestaPaginada<ProductoConStock>>(
+        `/productos/paginado?categoriaId=${categoria.id}&porPagina=1`,
+      )
+      .then((r) => r.total)
+      .catch(() => 0);
     let respuesta = '';
     const confirmado = await confirmar({
       titulo: `¿Deshabilitar la categoría "${categoria.nombre}"?`,
@@ -406,7 +469,7 @@ export function Productos() {
     cargar();
   }
 
-  if (!productos) return <EsqueletoProductos />;
+  if (!resultado) return <EsqueletoProductos />;
 
   // Ayudas en vivo del formulario de empaque
   const f = formulario;
@@ -589,9 +652,21 @@ export function Productos() {
             ) : (
               <span
                 key={categoria.id}
-                className="group flex items-center gap-1 rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-200"
+                className={`group flex items-center gap-1 rounded-full py-1 pl-1 pr-2 text-xs font-medium transition-colors ${
+                  categoriaFiltro === categoria.id
+                    ? 'bg-emerald-600 text-white'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
               >
-                {categoria.nombre}
+                <button
+                  type="button"
+                  onClick={() => filtrarPorCategoria(categoria.id)}
+                  aria-pressed={categoriaFiltro === categoria.id}
+                  title={categoriaFiltro === categoria.id ? 'Quitar filtro' : `Ver solo ${categoria.nombre}`}
+                  className="rounded-full px-2 py-0.5"
+                >
+                  {categoria.nombre}
+                </button>
                 {/* Editar / eliminar categoría: solo el ADMIN */}
                 {puedeEditar && (
                   <>
@@ -641,8 +716,8 @@ export function Productos() {
         </div>
       </div>
 
-      {/* ══════ Tabla del catálogo ══════ */}
-      <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
+      {/* ══════ Tabla del catálogo (30 por página) ══════ */}
+      <div ref={inicioTabla} className="scroll-mt-4 rounded-xl border border-gray-200 bg-white shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 px-5 py-3">
           <div className="flex min-w-[240px] flex-1 items-center gap-2">
             <Search className="h-4 w-4 shrink-0 text-gray-400" />
@@ -654,16 +729,33 @@ export function Productos() {
               className="w-full max-w-md rounded-lg border border-gray-300 px-3 py-1.5 text-sm outline-none focus:border-emerald-500"
             />
           </div>
-          <span className="text-xs text-gray-500">
-            {filtrados.length} de {productos.length} {productos.length === 1 ? "producto" : "productos"}
-          </span>
+          <div className="flex items-center gap-2 text-xs text-gray-500">
+            {categoriaFiltro && (
+              <button
+                type="button"
+                onClick={() => filtrarPorCategoria(categoriaFiltro)}
+                className="flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 font-semibold text-emerald-700 hover:bg-emerald-100"
+              >
+                {categorias.find((c) => c.id === categoriaFiltro)?.nombre}
+                <X className="h-3 w-3" aria-label="Quitar filtro de categoría" />
+              </button>
+            )}
+            <span>
+              {total} {total === 1 ? 'producto' : 'productos'}
+              {hayFiltros ? ' encontrados' : ''}
+            </span>
+          </div>
         </div>
 
-        {filtrados.length === 0 ? (
+        {cargandoPagina ? (
+          <div className="p-3">
+            <EsqueletoTabla filas={8} columnas={puedeEditar ? 7 : 6} />
+          </div>
+        ) : filtrados.length === 0 ? (
           <p className="px-5 py-10 text-center text-sm text-gray-500">
-            {productos.length === 0
+            {!hayFiltros
               ? `No hay productos registrados.${puedeCrear ? ' Cree el primero con "Nuevo producto".' : ''}`
-              : 'Ningún producto coincide con la búsqueda.'}
+              : 'Ningún producto coincide con la búsqueda o la categoría elegida.'}
           </p>
         ) : (
           <div className="overflow-x-auto">
@@ -773,6 +865,17 @@ export function Productos() {
               </tbody>
             </table>
           </div>
+        )}
+
+        {/* Paginación: máximo 30 productos por página */}
+        {!cargandoPagina && resultado.totalPaginas > 1 && (
+          <Paginacion
+            pagina={resultado.pagina}
+            totalPaginas={resultado.totalPaginas}
+            total={resultado.total}
+            porPagina={resultado.porPagina}
+            onCambiar={irAPagina}
+          />
         )}
       </div>
       </>

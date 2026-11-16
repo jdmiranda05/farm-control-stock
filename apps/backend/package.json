@@ -6,7 +6,11 @@
   "scripts": {
     "dev": "nest start --watch",
     "build": "nest build",
-    "start": "node dist/main.js"
+    "start": "node dist/main.js",
+    "demo:simular": "node scripts/demo/sembrar-demo.js --simular",
+    "demo:cargar": "node scripts/demo/sembrar-demo.js --confirmar",
+    "demo:eliminar": "node scripts/demo/sembrar-demo.js --eliminar",
+    "demo:contrasenas": "node scripts/demo/sembrar-demo.js --sincronizar-contrasenas"
   },
   "dependencies": {
     "@botica/comun": "workspace:*",
