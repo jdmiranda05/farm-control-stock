@@ -47,6 +47,8 @@ interface Props {
   deshabilitado?: boolean;
   /** Muestra un campo de búsqueda (por defecto, con más de 8 opciones). */
   buscable?: boolean;
+  /** Texto de ayuda del buscador (ej. "Buscar por nombre o RUC…"). */
+  marcadorBusqueda?: string;
   className?: string;
   icono?: ReactNode;
 }
@@ -64,6 +66,7 @@ export function Selector({
   invalido,
   deshabilitado,
   buscable,
+  marcadorBusqueda = 'Buscar…',
   className = '',
   icono,
 }: Props) {
@@ -90,10 +93,14 @@ export function Selector({
   const seleccionada = opciones.find((o) => o.valor === valor);
 
   const visibles = useMemo(() => {
-    const texto = filtro.trim().toLowerCase();
+    // Sin tildes ni mayúsculas: "drogueria" encuentra "Droguería"; "2045" encuentra el RUC
+    const normalizar = (t: string) =>
+      t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+    const texto = normalizar(filtro.trim());
     if (!texto) return opciones;
     return opciones.filter(
-      (o) => o.etiqueta.toLowerCase().includes(texto) || o.detalle?.toLowerCase().includes(texto),
+      (o) =>
+        normalizar(o.etiqueta).includes(texto) || (o.detalle ? normalizar(o.detalle).includes(texto) : false),
     );
   }, [opciones, filtro]);
 
@@ -263,7 +270,7 @@ export function Selector({
                   setActivo(0);
                 }}
                 onKeyDown={alTeclearEnLista}
-                placeholder="Buscar…"
+                placeholder={marcadorBusqueda}
                 aria-label="Buscar opción"
                 aria-controls={idLista}
                 aria-activedescendant={activo >= 0 ? `${idBase}-op-${activo}` : undefined}

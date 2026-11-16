@@ -25,6 +25,16 @@ export class ReportesController {
     return this.servicio.reporteDiario(usuario.botica_id, filtros);
   }
 
+  /**
+   * GET /api/reportes/diario/exportar?desde=&hasta= — descarga el reporte
+   * del periodo en Excel (.xlsx): resumen, movimientos y ventas.
+   */
+  @Roles(RolUsuario.ALMACENERO, RolUsuario.ADMIN)
+  @Get('diario/exportar')
+  exportarDiario(@UsuarioActual() usuario: PerfilUsuario, @Query() filtros: FiltroReporteDto) {
+    return this.servicio.exportarReporteDiario(usuario.botica_id, usuario.botica?.nombre ?? 'Botica', filtros);
+  }
+
   /** GET /api/reportes/merma — pérdidas económicas acumuladas en soles. */
   @Roles(RolUsuario.ALMACENERO, RolUsuario.ADMIN)
   @Get('merma')

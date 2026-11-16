@@ -29,6 +29,8 @@ async function iniciar() {
   app.enableCors({
     origin: process.env.ORIGEN_CORS?.split(',') ?? true,
     credentials: true,
+    // Permite al frontend leer el nombre de los archivos Excel que descarga
+    exposedHeaders: ['Content-Disposition'],
   });
 
   const puerto = Number(

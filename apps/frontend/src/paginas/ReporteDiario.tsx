@@ -22,6 +22,7 @@ import { api } from '../lib/api';
 import { TarjetaKpi } from '../componentes/ui/TarjetaKpi';
 import { Paginacion } from '../componentes/ui/Paginacion';
 import { EsqueletoReporte } from '../componentes/ui/Esqueleto';
+import { BotonExportarExcel } from '../componentes/ui/BotonExportarExcel';
 
 /** Etiqueta legible de cada tipo de movimiento. */
 const ETIQUETA_TIPO: Record<TipoMovimientoKardex, { texto: string; clases: string }> = {
@@ -115,12 +116,19 @@ export function ReporteDiario() {
               : `Del ${reporte.desde} al ${reporte.hasta}`}
           </p>
         </div>
-        <button
-          onClick={() => window.print()}
-          className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 print:hidden"
-        >
-          <Printer className="h-4 w-4" /> Imprimir reporte
-        </button>
+        <div className="flex flex-wrap items-start gap-2 print:hidden">
+          {/* Resumen + todos los movimientos y ventas del periodo elegido */}
+          <BotonExportarExcel
+            ruta={`/reportes/diario/exportar?desde=${reporte.desde}&hasta=${reporte.hasta}`}
+            nombrePorDefecto={`reporte_${reporte.desde}.xlsx`}
+          />
+          <button
+            onClick={() => window.print()}
+            className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 print:hidden"
+          >
+            <Printer className="h-4 w-4" /> Imprimir reporte
+          </button>
+        </div>
       </div>
 
       {/* ══════ Filtros de fecha ══════ */}

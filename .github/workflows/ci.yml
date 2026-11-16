@@ -1,0 +1,65 @@
+# ============================================================================
+#  INTEGRACIÓN CONTINUA (CI)
+#
+#  Qué hace: en cada push a main y en cada pull request verifica que el
+#  proyecto compila y que las reglas de negocio siguen funcionando.
+#
+#  Qué NO hace: no despliega ni toca la base de datos. Render (backend) y
+#  Netlify (frontend) siguen desplegando como siempre; este flujo solo avisa
+#  con una ✗ roja si un cambio rompería la compilación o una regla de negocio.
+#  Tampoco necesita secretos: no usa las claves de Supabase.
+# ============================================================================
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Si llegan dos pushes seguidos a la misma rama, se cancela la verificación vieja
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# Solo lectura del repositorio: el flujo no puede modificar nada
+permissions:
+  contents: read
+
+jobs:
+  verificar:
+    name: Compilar y probar
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v4
+
+      - name: Instalar pnpm (misma versión que en desarrollo)
+        uses: pnpm/action-setup@v4
+        with:
+          version: 12.4.1
+
+      - name: Instalar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Instalar dependencias (exactas, según pnpm-lock.yaml)
+        run: pnpm install --frozen-lockfile
+
+      - name: Compilar el paquete compartido (@botica/comun)
+        run: pnpm build:comun
+
+      - name: Revisar tipos del backend
+        run: pnpm --filter @botica/backend exec tsc --noEmit -p tsconfig.json
+
+      - name: Compilar el backend (lo mismo que hace Render)
+        run: pnpm --filter @botica/backend build
+
+      - name: Compilar el frontend (lo mismo que hace Netlify)
+        run: pnpm --filter @botica/frontend build
+
+      - name: Pruebas de reglas de negocio (FEFO, blísters, permisos, fechas)
+        run: node --test packages/comun/test/reglas.test.js apps/backend/test/negocio.test.js

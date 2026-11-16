@@ -8,7 +8,9 @@
     "dev": "pnpm build:comun && pnpm --parallel -r dev",
     "dev:backend": "pnpm build:comun && pnpm --filter @botica/backend dev",
     "dev:frontend": "pnpm build:comun && pnpm --filter @botica/frontend dev",
-    "build": "pnpm build:comun && pnpm --filter @botica/backend build && pnpm --filter @botica/frontend build"
+    "build": "pnpm build:comun && pnpm --filter @botica/backend build && pnpm --filter @botica/frontend build",
+    "test": "pnpm build:comun && pnpm --filter @botica/backend build && node --test packages/comun/test/reglas.test.js apps/backend/test/negocio.test.js",
+    "typecheck": "pnpm build:comun && pnpm --filter @botica/backend exec tsc --noEmit -p tsconfig.json && pnpm --filter @botica/frontend exec tsc --noEmit"
   },
   "engines": {
     "node": ">=20"

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
-import { ArrowDownToLine, PackageOpen, TriangleAlert } from 'lucide-react';
+import { ArrowDownToLine, CircleCheck, PackageOpen, Search, TriangleAlert } from 'lucide-react';
 import {
   EstadoSemaforo,
   UnidadEmpaque,
@@ -47,12 +47,19 @@ export function Inventario() {
   const [lotes, setLotes] = useState<RespuestaPaginada<LoteDetallado> | null>(null);
   const [pagina, setPagina] = useState(1);
   const [cargandoLotes, setCargandoLotes] = useState(false);
+  const [busquedaLotes, setBusquedaLotes] = useState('');
+  const [busquedaLotesAplicada, setBusquedaLotesAplicada] = useState('');
   /** TODOS los lotes con mercadería (no solo la página visible), para la merma. */
   const [lotesConStock, setLotesConStock] = useState<LoteDetallado[]>([]);
   const formularioMerma = useRef<HTMLFormElement>(null);
   const [soloVencidos, setSoloVencidos] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [mensaje, setMensaje] = useState<string | null>(null);
+  // Avisos de cada formulario: se muestran DEBAJO de su botón, junto a la acción
+  const [errorEntrada, setErrorEntrada] = useState<string | null>(null);
+  const [exitoEntrada, setExitoEntrada] = useState<string | null>(null);
+  const [errorMerma, setErrorMerma] = useState<string | null>(null);
+  const [exitoMerma, setExitoMerma] = useState<string | null>(null);
   const [procesando, setProcesando] = useState<'entrada' | 'merma' | null>(null);
 
   // Formulario de ENTRADA (recepción de compra)
@@ -91,6 +98,7 @@ export function Inventario() {
   const cargarLotes = useCallback(() => {
     const parametros = new URLSearchParams({ pagina: String(pagina), porPagina: '10' });
     if (soloVencidos) parametros.set('soloVencidos', 'true');
+    if (busquedaLotesAplicada) parametros.set('busqueda', busquedaLotesAplicada);
     setCargandoLotes(true);
     api
       .get<RespuestaPaginada<LoteDetallado>>(`/inventario/lotes?${parametros}`)
@@ -103,7 +111,19 @@ export function Inventario() {
         );
       })
       .finally(() => setCargandoLotes(false));
-  }, [pagina, soloVencidos]);
+  }, [pagina, soloVencidos, busquedaLotesAplicada]);
+
+  // La búsqueda de lotes se aplica 300 ms después de dejar de escribir
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const texto = busquedaLotes.trim();
+      setBusquedaLotesAplicada((anterior) => {
+        if (anterior !== texto) setPagina(1);
+        return texto;
+      });
+    }, 300);
+    return () => clearTimeout(t);
+  }, [busquedaLotes]);
 
   const cargarLotesConStock = useCallback(() => {
     api
@@ -134,7 +154,8 @@ export function Inventario() {
       unidad,
       motivo: vencido ? 'Vencido' : 'Próximo a vencer',
     });
-    setError(null);
+    setErrorMerma(null);
+    setExitoMerma(null);
     formularioMerma.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     setTimeout(() => formularioMerma.current?.querySelector<HTMLInputElement>('input')?.focus(), 350);
   }
@@ -169,11 +190,11 @@ export function Inventario() {
 
   async function registrarEntrada(evento: FormEvent) {
     evento.preventDefault();
-    setError(null);
-    setMensaje(null);
+    setErrorEntrada(null);
+    setExitoEntrada(null);
     const falla = validarEntrada();
     if (falla) {
-      setError(falla);
+      setErrorEntrada(falla);
       return;
     }
     setProcesando('entrada');
@@ -186,7 +207,7 @@ export function Inventario() {
         cantidadCajas: Number(entrada.cantidadCajas),
         costoCaja: Number(entrada.costoCaja),
       });
-      setMensaje(
+      setExitoEntrada(
         `Entrada registrada: ${entrada.cantidadCajas} ${
           productoEntrada && !tieneBlisters(productoEntrada) ? 'unidad(es)' : 'caja(s)'
         } del lote ${entrada.numeroLote.trim()}.`,
@@ -203,7 +224,7 @@ export function Inventario() {
       cargarLotes();
       cargarLotesConStock();
     } catch (e) {
-      setError((e as Error).message);
+      setErrorEntrada((e as Error).message);
     } finally {
       setProcesando(null);
     }
@@ -211,26 +232,26 @@ export function Inventario() {
 
   async function registrarMerma(evento: FormEvent) {
     evento.preventDefault();
-    setError(null);
-    setMensaje(null);
+    setErrorMerma(null);
+    setExitoMerma(null);
     if (!loteMerma) {
-      setError('Seleccione el lote afectado');
+      setErrorMerma('Seleccione el lote afectado');
       return;
     }
     const cantidad = Number(merma.cantidad);
     if (!Number.isInteger(cantidad) || cantidad < 1) {
-      setError('La cantidad de la merma debe ser un número entero mayor que 0');
+      setErrorMerma('La cantidad de la merma debe ser un número entero mayor que 0');
       return;
     }
     if (cantidad > maximoMerma) {
-      setError(
+      setErrorMerma(
         `El lote ${loteMerma.numero_lote} solo tiene ${maximoMerma} ` +
           `${merma.unidad === UnidadEmpaque.CAJA ? nombreCajas : 'blíster(es)'} disponibles`,
       );
       return;
     }
     if (merma.motivo.trim().length < 3) {
-      setError('Describa el motivo de la merma (mínimo 3 caracteres)');
+      setErrorMerma('Describa el motivo de la merma (mínimo 3 caracteres)');
       return;
     }
     setProcesando('merma');
@@ -244,7 +265,7 @@ export function Inventario() {
           motivo: merma.motivo.trim(),
         },
       );
-      setMensaje(
+      setExitoMerma(
         `${respuesta.mensaje} Pérdida valorizada en ${formatearSoles(respuesta.valorMermaSoles)}.`,
       );
       setMerma({ loteId: '', cantidad: '1', unidad: UnidadEmpaque.CAJA, motivo: '' });
@@ -252,7 +273,7 @@ export function Inventario() {
       cargarLotes();
       cargarLotesConStock();
     } catch (e) {
-      setError((e as Error).message);
+      setErrorMerma((e as Error).message);
     } finally {
       setProcesando(null);
     }
@@ -325,6 +346,7 @@ export function Inventario() {
                 etiquetaAccesible="Producto"
                 marcador="Seleccione un producto…"
                 buscable
+                marcadorBusqueda="Buscar por nombre…"
                 opciones={productos.map((producto) => ({
                   valor: producto.id,
                   etiqueta: producto.nombre,
@@ -341,6 +363,8 @@ export function Inventario() {
                 valor={entrada.proveedorId}
                 alCambiar={(valor) => setEntrada({ ...entrada, proveedorId: valor })}
                 etiquetaAccesible="Proveedor"
+                buscable
+                marcadorBusqueda="Buscar por nombre o RUC…"
                 opciones={[
                   { valor: '', etiqueta: 'Sin especificar' },
                   ...proveedores.map((p) => ({
@@ -414,6 +438,28 @@ export function Inventario() {
           >
             {procesando === 'entrada' ? 'Registrando…' : 'Registrar entrada'}
           </button>
+          {/* Avisos del formulario, justo debajo del botón */}
+          <div aria-live="polite">
+            {errorEntrada && (
+              <p
+                id="error-entrada"
+                role="alert"
+                className="aparecer mt-3 flex items-start gap-2 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700"
+              >
+                <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                {errorEntrada}
+              </p>
+            )}
+            {exitoEntrada && (
+              <p
+                role="status"
+                className="aparecer mt-3 flex items-start gap-2 rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-700"
+              >
+                <CircleCheck className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                {exitoEntrada}
+              </p>
+            )}
+          </div>
         </form>
 
         {/* ══════ MERMA ══════ */}
@@ -452,6 +498,7 @@ export function Inventario() {
                 etiquetaAccesible="Lote afectado"
                 marcador="Seleccione el lote afectado…"
                 buscable
+                marcadorBusqueda="Buscar por producto o N° de lote…"
                 opciones={lotesConStock.map((lote) => {
                   const dias = diasParaVencer(lote.fecha_vencimiento);
                   return {
@@ -525,6 +572,28 @@ export function Inventario() {
           >
             {procesando === 'merma' ? 'Registrando…' : 'Registrar merma'}
           </button>
+          {/* Avisos del formulario, justo debajo del botón */}
+          <div aria-live="polite">
+            {errorMerma && (
+              <p
+                id="error-merma"
+                role="alert"
+                className="aparecer mt-3 flex items-start gap-2 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700"
+              >
+                <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                {errorMerma}
+              </p>
+            )}
+            {exitoMerma && (
+              <p
+                role="status"
+                className="aparecer mt-3 flex items-start gap-2 rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-700"
+              >
+                <CircleCheck className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                {exitoMerma}
+              </p>
+            )}
+          </div>
           <div className="mt-4 flex items-start gap-3 rounded-xl bg-red-50 p-4">
             <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-red-600" aria-hidden="true" />
             <div>
@@ -547,6 +616,22 @@ export function Inventario() {
               Ordenados por vencimiento: el más próximo aparece primero (orden FEFO)
             </p>
           </div>
+          <div className="flex flex-wrap items-center gap-4">
+          <div className="relative">
+            <Search
+              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
+              aria-hidden="true"
+            />
+            <input
+              type="search"
+              value={busquedaLotes}
+              onChange={(e) => setBusquedaLotes(e.target.value)}
+              maxLength={60}
+              placeholder="Buscar lote, producto o proveedor…"
+              aria-label="Buscar lotes"
+              className="w-72 max-w-full rounded-lg border border-gray-300 py-2 pl-9 pr-3 text-sm outline-none focus:border-emerald-500"
+            />
+          </div>
           <label className="flex items-center gap-2 text-sm text-gray-600">
             <input
               type="checkbox"
@@ -559,6 +644,7 @@ export function Inventario() {
             />
             Ver solo vencidos
           </label>
+          </div>
         </div>
 
         {cargandoLotes ? (
@@ -567,9 +653,11 @@ export function Inventario() {
           </div>
         ) : lotes.datos.length === 0 ? (
           <p className="px-5 py-10 text-center text-sm text-gray-500">
-            {soloVencidos
-              ? 'No hay lotes vencidos. ¡Buen control de inventario!'
-              : 'Aún no hay lotes registrados.'}
+            {busquedaLotesAplicada
+              ? `Ningún lote coincide con "${busquedaLotesAplicada}".`
+              : soloVencidos
+                ? 'No hay lotes vencidos. ¡Buen control de inventario!'
+                : 'Aún no hay lotes registrados.'}
           </p>
         ) : (
           <>

@@ -1,4 +1,4 @@
-import { IsBooleanString, IsOptional, IsUUID } from 'class-validator';
+import { IsBooleanString, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
 import { PaginacionDto } from '../../comun/dto/paginacion.dto';
 
 /**
@@ -19,4 +19,10 @@ export class FiltroLotesDto extends PaginacionDto {
   @IsOptional()
   @IsBooleanString({ message: 'soloConStock debe ser "true" o "false"' })
   soloConStock?: string;
+
+  /** Texto libre: N° de lote, nombre o código del producto, proveedor o su RUC. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(60, { message: 'La búsqueda admite como máximo 60 caracteres' })
+  busqueda?: string;
 }

@@ -14,6 +14,7 @@ import { api } from '../lib/api';
 import { Selector } from '../componentes/ui/Selector';
 import { EsqueletoKardex, EsqueletoTabla } from '../componentes/ui/Esqueleto';
 import { Paginacion } from '../componentes/ui/Paginacion';
+import { BotonExportarExcel } from '../componentes/ui/BotonExportarExcel';
 import { useAutenticacion } from '../contexto/ContextoAutenticacion';
 import { esAdmin } from '../lib/permisos';
 
@@ -263,6 +264,20 @@ export function Kardex() {
             Limpiar filtros
           </button>
         )}
+        {/* Exporta con los mismos filtros: tipo y rango de fechas */}
+        <div className="ml-auto">
+          <BotonExportarExcel
+            ruta={`/kardex/exportar?${new URLSearchParams(
+              Object.entries({ tipo: filtroTipo, desde, hasta }).filter(([, v]) => v),
+            ).toString()}`}
+            nombrePorDefecto="kardex.xlsx"
+            motivoDeshabilitado={
+              desde && hasta && desde > hasta
+                ? 'La fecha "desde" no puede ser posterior a "hasta"'
+                : null
+            }
+          />
+        </div>
       </div>
 
       {/* ══════ Tabla de movimientos ══════ */}

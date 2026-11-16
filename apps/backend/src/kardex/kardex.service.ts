@@ -8,6 +8,10 @@ import {
 } from '@botica/comun';
 import { SupabaseService } from '../supabase/supabase.service';
 import { armarRespuestaPaginada, calcularRango } from '../comun/dto/paginacion.dto';
+import { finDelDia, inicioDelDia } from '../comun/fechas-peru';
+import { obtenerTodos } from '../comun/consultas';
+import { fechaLegible, generarExcel } from '../comun/excel';
+import { COLUMNAS_MOVIMIENTOS, NOMBRE_TIPO_MOVIMIENTO } from '../comun/columnas-kardex';
 import { FiltroKardexDto } from './dto/filtro-kardex.dto';
 import { CorregirMovimientoDto } from './dto/corregir-movimiento.dto';
 
@@ -95,10 +99,10 @@ export class KardexService {
 
     if (filtros.tipo) consulta = consulta.eq('tipo', filtros.tipo);
     if (filtros.productoId) consulta = consulta.eq('producto_id', filtros.productoId);
-    // Las fechas llegan como AAAA-MM-DD; se convierten al instante inicial y
-    // final del día para comparar contra la marca de tiempo `creado_en`.
-    if (filtros.desde) consulta = consulta.gte('creado_en', `${filtros.desde}T00:00:00`);
-    if (filtros.hasta) consulta = consulta.lte('creado_en', `${filtros.hasta}T23:59:59`);
+    // Las fechas llegan como AAAA-MM-DD; se convierten al primer y último
+    // instante de ese día en hora de PERÚ (no UTC) para comparar con `creado_en`.
+    if (filtros.desde) consulta = consulta.gte('creado_en', inicioDelDia(filtros.desde));
+    if (filtros.hasta) consulta = consulta.lte('creado_en', finDelDia(filtros.hasta));
 
     const { data, error, count } = await consulta
       .order('creado_en', { ascending: false })
@@ -110,6 +114,70 @@ export class KardexService {
       count ?? 0,
       pagina,
       porPagina,
+    );
+  }
+
+  /**
+   * EXPORTAR a Excel el kardex del periodo (con los mismos filtros de la
+   * pantalla). Incluye TODOS los movimientos, no solo la página visible.
+   */
+  async exportar(boticaId: string, nombreBotica: string, filtros: FiltroKardexDto) {
+    if (filtros.desde && filtros.hasta && filtros.desde > filtros.hasta) {
+      throw new BadRequestException('La fecha "desde" no puede ser posterior a la fecha "hasta"');
+    }
+    const movimientos = await obtenerTodos<MovimientoDetallado>(
+      (desde, hasta) => {
+        let consulta = this.supabase.cliente
+          .from('movimientos_kardex')
+          .select(this.SELECCION_DETALLADA)
+          .eq('botica_id', boticaId);
+        if (filtros.tipo) consulta = consulta.eq('tipo', filtros.tipo);
+        if (filtros.productoId) consulta = consulta.eq('producto_id', filtros.productoId);
+        if (filtros.desde) consulta = consulta.gte('creado_en', inicioDelDia(filtros.desde));
+        if (filtros.hasta) consulta = consulta.lte('creado_en', finDelDia(filtros.hasta));
+        return consulta
+          .order('creado_en', { ascending: true })
+          .order('id', { ascending: true })
+          .range(desde, hasta);
+      },
+      { contexto: 'exportar el kardex' },
+    );
+
+    const periodo =
+      filtros.desde || filtros.hasta
+        ? `Del ${filtros.desde ? fechaLegible(filtros.desde) : 'inicio'} al ${filtros.hasta ? fechaLegible(filtros.hasta) : 'hoy'}`
+        : 'Historial completo';
+    const porTipo = (t: TipoMovimientoKardex) => movimientos.filter((m) => m.tipo === t);
+    const resumen = [
+      { etiqueta: 'Movimientos exportados', valor: movimientos.length, formato: 'entero' as const },
+      ...(filtros.tipo ? [{ etiqueta: 'Filtro de tipo', valor: NOMBRE_TIPO_MOVIMIENTO[filtros.tipo] }] : []),
+      ...Object.values(TipoMovimientoKardex).map((t) => ({
+        etiqueta: `${NOMBRE_TIPO_MOVIMIENTO[t]} — registros`,
+        valor: porTipo(t).length,
+        formato: 'entero' as const,
+      })),
+      {
+        etiqueta: 'Valor de entradas (costo)',
+        valor: porTipo(TipoMovimientoKardex.ENTRADA_MANUAL).reduce((s, m) => s + Number(m.valor_soles), 0),
+        formato: 'soles' as const,
+      },
+      {
+        etiqueta: 'Valor de ventas',
+        valor: porTipo(TipoMovimientoKardex.SALIDA_VENTA).reduce((s, m) => s + Number(m.valor_soles), 0),
+        formato: 'soles' as const,
+      },
+      {
+        etiqueta: 'Pérdida por merma (costo)',
+        valor: porTipo(TipoMovimientoKardex.SALIDA_MERMA).reduce((s, m) => s + Number(m.valor_soles), 0),
+        formato: 'soles' as const,
+      },
+    ];
+
+    const sufijo = [filtros.desde, filtros.hasta].filter(Boolean).join('_a_') || 'completo';
+    return generarExcel(
+      { botica: nombreBotica, titulo: 'Kardex — historial de entradas y salidas', periodo, resumen },
+      [{ nombre: 'Kardex', columnas: COLUMNAS_MOVIMIENTOS, filas: movimientos }],
+      `kardex_${sufijo}.xlsx`,
     );
   }
 

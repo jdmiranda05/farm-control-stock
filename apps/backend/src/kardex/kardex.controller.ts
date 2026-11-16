@@ -24,6 +24,16 @@ export class KardexController {
     return this.servicio.listar(usuario.botica_id, filtros);
   }
 
+  /**
+   * GET /api/kardex/exportar?tipo=&desde=&hasta= — descarga el kardex del
+   * periodo en Excel (.xlsx), con los mismos filtros que la pantalla.
+   */
+  @Roles(RolUsuario.ALMACENERO, RolUsuario.ADMIN)
+  @Get('exportar')
+  exportar(@UsuarioActual() usuario: PerfilUsuario, @Query() filtros: FiltroKardexDto) {
+    return this.servicio.exportar(usuario.botica_id, usuario.botica?.nombre ?? 'Botica', filtros);
+  }
+
   /** GET /api/kardex/producto/:id — historial reciente de un producto. */
   @Roles(RolUsuario.ALMACENERO, RolUsuario.ADMIN)
   @Get('producto/:id')

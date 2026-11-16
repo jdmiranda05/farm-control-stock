@@ -55,6 +55,30 @@ export class InventarioService {
       consulta = consulta.or('cajas_completas.gt.0,blisters_sueltos.gt.0');
     }
 
+    // Búsqueda: N° de lote, o productos / proveedores cuyo nombre, código o RUC coincida
+    const texto = (filtros.busqueda ?? '').replace(/[,()%*\\]/g, ' ').trim();
+    if (texto) {
+      const patron = `%${texto}%`;
+      const [{ data: productos }, { data: proveedores }] = await Promise.all([
+        this.supabase.cliente
+          .from('productos')
+          .select('id')
+          .eq('botica_id', boticaId)
+          .or(`nombre.ilike.${patron},codigo.ilike.${patron}`)
+          .limit(200),
+        this.supabase.cliente
+          .from('proveedores')
+          .select('id')
+          .eq('botica_id', boticaId)
+          .or(`nombre.ilike.${patron},ruc.ilike.${patron}`)
+          .limit(50),
+      ]);
+      const condiciones = [`numero_lote.ilike.${patron}`];
+      if (productos?.length) condiciones.push(`producto_id.in.(${productos.map((p) => p.id).join(',')})`);
+      if (proveedores?.length) condiciones.push(`proveedor_id.in.(${proveedores.map((p) => p.id).join(',')})`);
+      consulta = consulta.or(condiciones.join(','));
+    }
+
     const { data, error, count } = await consulta
       // Orden FEFO también en la pantalla: lo que vence antes se ve primero.
       .order('fecha_vencimiento', { ascending: true })
